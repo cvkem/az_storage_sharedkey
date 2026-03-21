@@ -1,0 +1,13 @@
+[package]
+name = "test-client"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+base64 = "0.22.1"
+chrono = "0.4.44"
+hmac = "0.12.1"
+regex = "1.12.3"
+reqwest = { version = "0.13.2", features = ["blocking","query"] }
+sha2 = "0.10.9"
+urlencoding = "2.1.3"
