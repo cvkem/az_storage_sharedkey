@@ -15,7 +15,11 @@ pub struct AuthHeader {
     content_length: String
 }
 
-
+impl Default for AuthHeader {
+     fn default() -> Self {
+         Self::new()
+     }
+}
 
 
 
@@ -39,7 +43,6 @@ impl AuthHeader {
         // draw an array of slices that can be ordered, without changing the original (as it is not mutable) and next sort it.
         let mut ms_headers: Vec<_> = self.ms_headers
             .iter()
-            .map(|kv| kv)
             .collect();
         ms_headers.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -60,7 +63,7 @@ impl AuthHeader {
             .expect("Use set_query_params to add the query parameters. Add an empty vec if there are none.")
             .iter()
             .for_each(|p| {
-                to_sign.push_str("\n");
+                to_sign.push('\n');
                 to_sign.push_str(&format!("{}:{}", p.0, p.1));
         });
 
@@ -118,7 +121,7 @@ impl AuthHeader {
     // TODO: add cleansing (and split parameter and value)
     pub fn set_query_params(mut self, qp: &[(&str, &str)]) -> Self {
         let mut qp: Vec<_> = qp
-            .into_iter()
+            .iter()
             .map(|(k, v)| (k.trim().to_lowercase(), v.trim().to_string()))
             .collect();
         qp.sort_by(|a, b| a.0.cmp(&b.0));

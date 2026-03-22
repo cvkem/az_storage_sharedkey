@@ -98,8 +98,10 @@ fn test_create_container() {
         .send();
 
     println!("The PUT-response: {res:?}");
-
-    assert!(res.is_ok(), "Write failed with result {res:?}");
+    let status = res
+        .expect("Create container failed with result {res:?}")
+        .status();
+    assert!(status == reqwest::StatusCode::CREATED, "Expected status 201 CREATED, but observed http-status: {status}");
 
 }
 
@@ -152,7 +154,10 @@ fn test_create_block_blob() {
 
     println!("The PUT-response: {res:?}");
 
-    assert!(res.is_ok(), "Write failed with result {res:?}");
+    let status = res
+        .expect("Write blob failed with result {res:?}")
+        .status();
+    assert!(status == reqwest::StatusCode::CREATED, "Expected status 201 CREATED, but observed http-status: {status}");
 
 }
 
@@ -200,7 +205,12 @@ fn test_get_block_blob() {
 
     println!("The GET-response: {res:?}");
 
-    assert!(res.is_ok(), "Get failed with result {res:?}");
+    let status = res
+        .as_ref()
+        .expect("Get blob failed with result {res:?}")
+        .status();
+    assert!(status == reqwest::StatusCode::OK, "Expected status 201 CREATED, but observed http-status: {status}");
+   
 
     let data = res.expect("Expected response-success").bytes().expect("Data as bytes in reponse");
     let s = String::from_utf8_lossy(&data);
