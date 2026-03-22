@@ -1,13 +1,12 @@
+use base64::prelude::*;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
-use base64::prelude::*;
 
 // Define HMAC type
 pub type HmacSha256 = Hmac<Sha256>;
 
 /// base64 decoding for utf8 strings
-pub fn b64_decode_utf8(encoded_data: &str) -> String{
-
+pub fn b64_decode_utf8(encoded_data: &str) -> String {
     //let encoded_data = "SGVsbG8sIFJ1c3Qh"; // "Hello, Rust!"
 
     match BASE64_STANDARD.decode(encoded_data) {
@@ -20,16 +19,16 @@ pub fn b64_decode_utf8(encoded_data: &str) -> String{
         Err(e) => {
             eprintln!("Decoding error: {}", e);
             "".to_owned()
-        },
+        }
     }
 }
 
 /// decoding base64 for binary data.
 pub fn b64_decode(encoded_data: &str) -> Vec<u8> {
-    BASE64_STANDARD.decode(encoded_data).expect("Invalid base64 encoding (based on BASE64_STANDARD engine)")
+    BASE64_STANDARD
+        .decode(encoded_data)
+        .expect("Invalid base64 encoding (based on BASE64_STANDARD engine)")
 }
-
-
 
 pub fn get_hmac_b64(key_b64: &str, message: &str) -> String {
     // extract the base-64 encoded key

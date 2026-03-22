@@ -1,7 +1,6 @@
+use super::hmac_sha256;
 use reqwest::header::{HeaderMap, HeaderName};
 use urlencoding::decode;
-use super::hmac_sha256;
-
 
 use super::GET;
 pub struct AuthHeader {
@@ -9,54 +8,54 @@ pub struct AuthHeader {
     store_account: Option<String>,
     store_account_key: String,
     path: Option<String>,
-    ms_headers: Vec<(String, String)>, 
-    headers: Vec<(String, String)>, 
-    query_params: Option<Vec<(String,String)>>,
-    content_length: String
+    ms_headers: Vec<(String, String)>,
+    headers: Vec<(String, String)>,
+    query_params: Option<Vec<(String, String)>>,
+    content_length: String,
 }
 
 impl Default for AuthHeader {
-     fn default() -> Self {
-         Self::new()
-     }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-
-
-
 impl AuthHeader {
-
     pub fn new() -> Self {
-        AuthHeader{
-            method: GET, 
+        AuthHeader {
+            method: GET,
             store_account: None,
             store_account_key: String::new(),
             path: None,
             ms_headers: Vec::new(),
             headers: Vec::new(),
             query_params: None,
-            content_length: "".to_owned()
+            content_length: "".to_owned(),
         }
     }
 
     pub fn get_string_to_sign(&self) -> String {
         // draw an array of slices that can be ordered, without changing the original (as it is not mutable) and next sort it.
-        let mut ms_headers: Vec<_> = self.ms_headers
-            .iter()
-            .collect();
+        let mut ms_headers: Vec<_> = self.ms_headers.iter().collect();
         ms_headers.sort_by(|a, b| a.0.cmp(&b.0));
 
         let ms_headers = ms_headers
             .iter()
-            .map(|(k,v)| format!("{k}:{v}\n"))
+            .map(|(k, v)| format!("{k}:{v}\n"))
             .collect::<Vec<_>>()
             .join("");
-        let mut to_sign = format!("{}\n\n\n{}\n\n\n\n\n\n\n\n\n{}/{}{}",
+        let mut to_sign = format!(
+            "{}\n\n\n{}\n\n\n\n\n\n\n\n\n{}/{}{}",
             self.method,
             self.content_length,
             ms_headers,
-            self.store_account.as_ref().expect("use set_store_account to set the storage account"),
-            self.path.as_ref().expect("Use set_resources() to initialize the resource-path (including the initial '/')"));
+            self.store_account
+                .as_ref()
+                .expect("use set_store_account to set the storage account"),
+            self.path.as_ref().expect(
+                "Use set_resources() to initialize the resource-path (including the initial '/')"
+            )
+        );
         // add resources to the to_sign string
         self.query_params
             .as_ref()
@@ -68,19 +67,22 @@ impl AuthHeader {
         });
 
         to_sign
-
     }
 
     pub fn get_shared_authorization(&self) -> String {
         let to_sign = self.get_string_to_sign();
 
-    let signed = hmac_sha256::get_hmac_b64(&self.store_account_key, &to_sign);
+        let signed = hmac_sha256::get_hmac_b64(&self.store_account_key, &to_sign);
 
-    let shared_auth = format!("SharedKey {}:{}",
-        self.store_account.as_ref().expect("use set_store_account to set the storage account"),
-        signed);
-    shared_auth
-}
+        let shared_auth = format!(
+            "SharedKey {}:{}",
+            self.store_account
+                .as_ref()
+                .expect("use set_store_account to set the storage account"),
+            signed
+        );
+        shared_auth
+    }
 
     pub fn set_method(mut self, method: &'static str) -> Self {
         self.method = method;
@@ -92,7 +94,6 @@ impl AuthHeader {
         self.store_account_key = store_account_key;
         self
     }
-
 
     pub fn set_path(mut self, path: String) -> Self {
         self.path = Some(path);
@@ -109,7 +110,7 @@ impl AuthHeader {
     //     self
     // }
 
-    // // assume the date_str 
+    // // assume the date_str
     // pub fn set_datetime_str(mut self, utc_date_str: String) -> Self {
     //     self.utc_date_str = Some(utc_date_str);
     //     self
@@ -127,20 +128,28 @@ impl AuthHeader {
         qp.sort_by(|a, b| a.0.cmp(&b.0));
         self.query_params = Some(qp);
         self
-    } 
+    }
 
     // collect the x-ms- headers, order them, url-decode them  and add these to the vectors with ms_headers and headers based on the key-prefix.
     pub fn add_headermap(mut self, headers: &HeaderMap) -> Self {
-
         headers
             .iter()
-            .map(|(key, val)| (decode(key.as_str()).expect("UTF-8 key").into_owned(), decode(val.to_str().unwrap()).expect("UFT-8 value").into_owned()))
+            .map(|(key, val)| {
+                (
+                    decode(key.as_str()).expect("UTF-8 key").into_owned(),
+                    decode(val.to_str().unwrap())
+                        .expect("UFT-8 value")
+                        .into_owned(),
+                )
+            })
             .map(|(k, v)| (k.to_string(), v.to_string()))
-            .for_each( |kv| if kv.0.as_str().starts_with("x-ms-") {
-                        self.ms_headers.push(kv);
-                    } else {
-                        self.headers.push(kv);
-                    });
+            .for_each(|kv| {
+                if kv.0.as_str().starts_with("x-ms-") {
+                    self.ms_headers.push(kv);
+                } else {
+                    self.headers.push(kv);
+                }
+            });
         self
     }
 
@@ -165,12 +174,12 @@ impl AuthHeader {
     pub fn get_headermap(&self) -> HeaderMap {
         let mut hm = HeaderMap::new();
 
-
-        self.headers
-            .iter()
-            .for_each(|(k, v)|  { let _ = hm.append(HeaderName::from_bytes(k.as_bytes()).unwrap(), v.to_owned().parse().unwrap()); });
+        self.headers.iter().for_each(|(k, v)| {
+            let _ = hm.append(
+                HeaderName::from_bytes(k.as_bytes()).unwrap(),
+                v.to_owned().parse().unwrap(),
+            );
+        });
         hm
     }
-
 }
-
