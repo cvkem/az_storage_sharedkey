@@ -1,4 +1,7 @@
-//use Anyhow::{Result};
+//#[cfg(test)]
+use crate::{
+    auth_header::{self, AuthHeader},
+    date::{utc_date_str_now, utc_date_str}};
 
 use chrono::{Utc, TimeZone};
 use reqwest::{
@@ -6,16 +9,23 @@ use reqwest::{
     header::{HeaderMap}
 };
 
+
+// default account and key based on:
+//  https://docs.azure.cn/en-us/storage/common/storage-connect-azurite?tabs=blob-storage
+//    Account name: devstoreaccount1
+//    Account key: Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==
+
+const TEST_STORE_ACCOUNT: &str = "devstoreaccount1";
+const TEST_STORE_ACCOUNT_KEY_B64: &str = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
+
+
 const PROTOCOL: &str = "http";
 const BLOB_SERVICE: &str = "azurite.local:10000";
-const STORE_ACCOUNT: &str = "devstoreaccount1";
 const CONTAINER: &str = "container";
 
 const BLOB_NAME: &str = "blob_name";
 const BLOB_CONTENT: &str = "Hello world!";
 
-mod auth_header;
-use auth_header::{AuthHeader, utc_date_str_now, utc_date_str};
 
 
 fn compare_strings(to_sign: &str, expect: &str) {
@@ -46,7 +56,7 @@ fn check_to_sign_without_xmsdate(to_sign: &str, expect: &str) -> bool {
 
 fn test_create_container() {
 
-    println!("\nCreate container {CONTAINER} in store-account {STORE_ACCOUNT}");
+    println!("\nCreate container {CONTAINER} in store-account {TEST_STORE_ACCOUNT}");
     let client = blocking::Client::new();
 
     let path = format!("/{CONTAINER}");
@@ -65,7 +75,7 @@ fn test_create_container() {
     // first build auth-header witout autorization to be able to extract the 
     let auth_header = AuthHeader::new()
         .set_method(auth_header::PUT)
-        .set_store_account(STORE_ACCOUNT.to_owned())
+        .set_store_account(TEST_STORE_ACCOUNT.to_owned(), TEST_STORE_ACCOUNT_KEY_B64.to_owned())
         .set_path(path.to_owned())
         .set_query_params(&query_pars)
         .add_headermap(&headers);
@@ -79,7 +89,7 @@ fn test_create_container() {
     headers.insert("Authorization", auth_val.parse().unwrap());
 
 
-    let create_container_url = format!("{PROTOCOL}://{STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
+    let create_container_url = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
     println!("URL: {}", create_container_url);
     let res = client
         .put(create_container_url)
@@ -97,7 +107,7 @@ fn test_create_container() {
 fn test_create_block_blob() {
     let body_content = BLOB_CONTENT.as_bytes();
 
-    println!("\nCreate blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{STORE_ACCOUNT}'.");
+    println!("\nCreate blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{TEST_STORE_ACCOUNT}'.");
     let client = blocking::Client::new();
 
     let path = format!("/{CONTAINER}/{BLOB_NAME}");
@@ -116,7 +126,7 @@ fn test_create_block_blob() {
     // first build auth-header witout autorization to be able to extract the 
     let auth_header = AuthHeader::new()
         .set_method(auth_header::PUT)
-        .set_store_account(STORE_ACCOUNT.to_owned())
+        .set_store_account(TEST_STORE_ACCOUNT.to_owned(), TEST_STORE_ACCOUNT_KEY_B64.to_owned())
         .set_path(path.to_owned())
         .add_headermap(&headers)
         .set_content_length(body_content.len())
@@ -132,7 +142,7 @@ fn test_create_block_blob() {
     headers.insert("Authorization", auth_val.parse().unwrap());
 
 
-    let create_container_url = format!("{PROTOCOL}://{STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
+    let create_container_url = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
     println!("URL: {}", create_container_url);
     let res = client
         .put(create_container_url)
@@ -149,7 +159,7 @@ fn test_create_block_blob() {
 fn test_get_block_blob() {
     let body_content = BLOB_CONTENT.as_bytes();
 
-    println!("\nGet blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{STORE_ACCOUNT}'.");
+    println!("\nGet blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{TEST_STORE_ACCOUNT}'.");
     let client = blocking::Client::new();
 
     let path = format!("/{CONTAINER}/{BLOB_NAME}");
@@ -166,7 +176,7 @@ fn test_get_block_blob() {
     // first build auth-header witout autorization to be able to extract the 
     let auth_header = AuthHeader::new()
         .set_method(auth_header::GET)
-        .set_store_account(STORE_ACCOUNT.to_owned())
+        .set_store_account(TEST_STORE_ACCOUNT.to_owned(), TEST_STORE_ACCOUNT_KEY_B64.to_owned())
         .set_path(path.to_owned())
         .set_headermap(&headers)
         .set_query_params(&[]);
@@ -181,7 +191,7 @@ fn test_get_block_blob() {
     headers.insert("Authorization", auth_val.parse().unwrap());
 
 
-    let get_container_url = format!("{PROTOCOL}://{STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
+    let get_container_url = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
     println!("URL: {}", get_container_url);
     let res = client
         .get(get_container_url)
@@ -200,7 +210,7 @@ fn test_get_block_blob() {
 }
 
 
-
+#[test]
 fn test_authorization() {
     // Building up next request
     // GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n/myaccount/mycontainer\ncomp:metadata\nrestype:container\ntimeout:20
@@ -221,7 +231,7 @@ fn test_authorization() {
 
     let auth_header = AuthHeader::new()
         .set_method(auth_header::GET) 
-        .set_store_account("myaccount".to_owned())
+        .set_store_account("myaccount".to_owned(), TEST_STORE_ACCOUNT_KEY_B64.to_owned())
         .set_path("/mycontainer".to_owned())
         .add_headermap(&headers)
         //.set_datetime(&dt)  // Better to use UTC, but TZ should be dropped anyway
@@ -236,9 +246,8 @@ fn test_authorization() {
     println!("Expected:                     \nAuthorization: SharedKey myaccount:ctzMq410TV3wS7upTBcunJTDLEJwMAZuFPfr0mrrA08=")
 }
 
-fn main() {
-
-    test_authorization();
+#[test]
+fn run_tests_in_sequence() {
 
     test_create_container();
 
