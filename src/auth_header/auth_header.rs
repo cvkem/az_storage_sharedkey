@@ -1,42 +1,68 @@
+use crate::date::utc_date_str;
+
 use super::hmac_sha256;
-use reqwest::header::{HeaderMap, HeaderName};
+use reqwest::header::{HeaderMap, IntoHeaderName, HeaderValue};
+use chrono::{DateTime, TimeZone, Utc};
 use urlencoding::decode;
 
 use super::GET;
-pub struct AuthHeader {
+
+const MSDATE_kEY: &str = "x-ms-date";
+
+pub struct AuthHeader<'a> {
     method: &'static str,
-    store_account: Option<String>,
-    store_account_key: String,
+    store_account: Option<&'a str>,
+    store_account_key: &'a str,
     path: Option<String>,
-    ms_headers: Vec<(String, String)>,
-    headers: Vec<(String, String)>,
+    datetime: Option<DateTime<Utc>>,
+    // ms_headers: Vec<(String, String)>,
+    // headers: Vec<(String, String)>,
+    headermap: Option<HeaderMap>,
     query_params: Option<Vec<(String, String)>>,
     content_length: String,
 }
 
-impl Default for AuthHeader {
+impl<'a> Default for AuthHeader<'a> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl AuthHeader {
+impl<'a> AuthHeader<'a> {
     pub fn new() -> Self {
         AuthHeader {
             method: GET,
             store_account: None,
-            store_account_key: String::new(),
+            store_account_key: "",
             path: None,
-            ms_headers: Vec::new(),
-            headers: Vec::new(),
+            datetime: None,
+            // ms_headers: Vec::new(),
+            // headers: Vec::new(),
+            headermap: None,
             query_params: None,
             content_length: "".to_owned(),
         }
     }
 
+    pub fn set_datetime<T>(mut self, dt: DateTime<T>) -> Self 
+        where T: TimeZone {
+        self.datetime = Some(dt.to_utc());
+        self
+    }
+
+    /// get the string that needs to be signed to get the authorization-header.
+    /// However, beware that header 'x-ms-date' still might be missing as that is added last-minute)
     pub fn get_string_to_sign(&self) -> String {
-        // draw an array of slices that can be ordered, without changing the original (as it is not mutable) and next sort it.
-        let mut ms_headers: Vec<_> = self.ms_headers.iter().collect();
+        // draw an array of 'x-ms-...'  headers and sort them on the key.
+        let mut ms_headers: Vec<_> = self
+            .headermap
+            .as_ref()
+            .expect("Headermap needs to be defined. Insert at least one headermap value via 'insert_header'.")
+            .iter()
+            .map(|(k, v)| (k.as_str(), v)) // only translate name, as value is not needed
+            .filter(|(k, _)| k.starts_with("x-ms-"))
+            .map(|(k, v)| (k, v.to_str().expect("x-ms- headers should only contain ascii-values. However binary value detected for key {k}")))
+            .collect();
         ms_headers.sort_by(|a, b| a.0.cmp(&b.0));
 
         let ms_headers = ms_headers
@@ -89,7 +115,7 @@ impl AuthHeader {
         self
     }
 
-    pub fn set_store_account(mut self, store_account: String, store_account_key: String) -> Self {
+    pub fn set_store_account(mut self, store_account: &'a str, store_account_key: &'a str) -> Self {
         self.store_account = Some(store_account);
         self.store_account_key = store_account_key;
         self
@@ -116,10 +142,9 @@ impl AuthHeader {
     //     self
     // }
 
-    // assuming the query paramters do not have redundant whitespace, are url-decoded and parameter-names are in lower-case.
+    // set_query_paramters assumes the query parameters do not have redundant whitespace, are url-decoded and parameter-names are in lower-case.
     // In case of multiple parameter-values the values should be ordered!
     // source: https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-headers-string
-    // TODO: add cleansing (and split parameter and value)
     pub fn set_query_params(mut self, qp: &[(&str, &str)]) -> Self {
         let mut qp: Vec<_> = qp
             .iter()
@@ -130,56 +155,92 @@ impl AuthHeader {
         self
     }
 
-    // collect the x-ms- headers, order them, url-decode them  and add these to the vectors with ms_headers and headers based on the key-prefix.
-    pub fn add_headermap(mut self, headers: &HeaderMap) -> Self {
-        headers
-            .iter()
-            .map(|(key, val)| {
-                (
-                    decode(key.as_str()).expect("UTF-8 key").into_owned(),
-                    decode(val.to_str().unwrap())
-                        .expect("UFT-8 value")
-                        .into_owned(),
-                )
-            })
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .for_each(|kv| {
-                if kv.0.as_str().starts_with("x-ms-") {
-                    self.ms_headers.push(kv);
-                } else {
-                    self.headers.push(kv);
-                }
-            });
+    // // collect the x-ms- headers, order them, url-decode them  and add these to the vectors with ms_headers and headers based on the key-prefix.
+    // pub fn add_headermap(mut self, headers: &HeaderMap) -> Self {
+    //     headers
+    //         .iter()
+    //         .map(|(key, val)| {
+    //             (
+    //                 decode(key.as_str()).expect("UTF-8 key").into_owned(),
+    //                 decode(val.to_str().unwrap())
+    //                     .expect("UFT-8 value")
+    //                     .into_owned(),
+    //             )
+    //         })
+    //         .map(|(k, v)| (k.to_string(), v.to_string()))
+    //         .for_each(|kv| {
+    //             if kv.0.as_str().starts_with("x-ms-") {
+    //                 self.ms_headers.push(kv);
+    //             } else {
+    //                 self.headers.push(kv);
+    //             }
+    //         });
+    //     self
+    // }
+
+    /// Insert the (key, value) as a header in the headermap, creating an empty headermap if none exists yet.
+    pub fn insert_header<K>(mut self, key: K, value: HeaderValue) -> Self 
+        where K: IntoHeaderName + ToString {
+        // using to_string as
+        assert!(key.to_string() != MSDATE_kEY, "Use the method 'self.set_date(...) to add a date to the headers." );
+//        self.headermap = self.headermap.or(Some(HeaderMap::new()));
+
+        self
+            .headermap
+            .get_or_insert(HeaderMap::new())
+            .append(key, value);
+
         self
     }
 
-    // clearn the collected headers and replace them with headers from the headersmap
-    pub fn set_headermap(mut self, headers: &HeaderMap) -> Self {
-        self.ms_headers.clear();
-        self.headers.clear();
+    /// get the existing headermap and extend it with the with an x-ms-date and an Autorization field.
+    pub fn get_headermap(mut self) -> HeaderMap {
+        // add missing headers needed to compute the shared-key
+        {
+            let hm = self
+                .headermap
+                .get_or_insert(HeaderMap::new());
 
-        self.add_headermap(headers)
-    }
-
-    // add the header to the righ queue
-    pub fn add_header(mut self, k: String, v: String) -> Self {
-        if k.starts_with("x-ms-") {
-            self.ms_headers.push((k, v))
-        } else {
-            self.headers.push((k, v))
+            let datetime_str = utc_date_str(&self.datetime.unwrap_or(Utc::now()));
+            hm.insert(MSDATE_kEY, HeaderValue::from_str(&datetime_str).unwrap());
+            // add content length !!
         }
-        self
-    }
+        let auth_val = self.get_shared_authorization();
 
-    pub fn get_headermap(&self) -> HeaderMap {
-        let mut hm = HeaderMap::new();
+        let mut hm = self.headermap.expect("No headermap present. Insert value with 'insert_header'.");
 
-        self.headers.iter().for_each(|(k, v)| {
-            let _ = hm.append(
-                HeaderName::from_bytes(k.as_bytes()).unwrap(),
-                v.to_owned().parse().unwrap(),
-            );
-        });
+        hm.insert("Authorization", auth_val.parse().unwrap());
+
         hm
     }
+
+    // // clearn the collected headers and replace them with headers from the headersmap
+    // pub fn set_headermap(mut self, headers: &HeaderMap) -> Self {
+    //     self.ms_headers.clear();
+    //     self.headers.clear();
+
+    //     self.add_headermap(headers)
+    // }
+
+    // // add the header to the righ queue
+    // pub fn add_header(mut self, k: String, v: String) -> Self {
+    //     if k.starts_with("x-ms-") {
+    //         self.ms_headers.push((k, v))
+    //     } else {
+    //         self.headers.push((k, v))
+    //     }
+    //     self
+    // }
+
+    // pub fn get_headermap(&self) -> HeaderMap {
+    //     let mut hm = HeaderMap::new();
+
+    //     self.headers.iter().for_each(|(k, v)| {
+    //         let _ = hm.append(
+    //             HeaderName::from_bytes(k.as_bytes()).unwrap(),
+    //             v.to_owned().parse().unwrap(),
+    //         );
+    //     });
+    //     hm
+    // }
 }

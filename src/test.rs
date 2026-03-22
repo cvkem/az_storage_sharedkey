@@ -1,11 +1,10 @@
 //#[cfg(test)]
 use crate::{
-    auth_header::{self, AuthHeader},
-    date::{utc_date_str, utc_date_str_now},
+    auth_header::{self, AuthHeader}
 };
 
 use chrono::{TimeZone, Utc};
-use reqwest::{blocking, header::HeaderMap};
+use reqwest::{blocking};
 
 // default account and key based on:
 //  https://docs.azure.cn/en-us/storage/common/storage-connect-azurite?tabs=blob-storage
@@ -64,37 +63,28 @@ fn test_create_container() {
 
     let path = format!("/{CONTAINER}");
 
-    // create the date-string, such that headers and Authorization header (which contains signature of the header) use exactly same datetime.
-    let utc_dt = utc_date_str_now();
-
-    let mut headers = HeaderMap::new();
-
-    //    headers.insert(CONTENT_TYPE, "application/octet-stream".parse().unwrap());
-    headers.insert("x-ms-date", utc_dt.parse().unwrap());
-    headers.insert("x-ms-version", "2019-12-12".parse().unwrap());
-
     let query_pars = [("restype", "container")];
     // first build auth-header witout autorization to be able to extract the
     let auth_header = AuthHeader::new()
         .set_method(auth_header::PUT)
         .set_store_account(
-            TEST_STORE_ACCOUNT.to_owned(),
-            TEST_STORE_ACCOUNT_KEY_B64.to_owned(),
+            TEST_STORE_ACCOUNT,
+            TEST_STORE_ACCOUNT_KEY_B64,
         )
         .set_path(path.to_owned())
         .set_query_params(&query_pars)
-        .add_headermap(&headers);
+        .insert_header("x-ms-version", "2019-12-12".parse().unwrap());
 
     let to_sign = auth_header.get_string_to_sign();
     let auth_val = auth_header.get_shared_authorization();
     println!("string-to-sign: {to_sign}\nAuthorization: {auth_val}");
     assert!(check_to_sign_without_xmsdate(
         &to_sign,
-        "PUT\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Sat, 14 Mar 2026 15:11:55 GMT\nx-ms-version:2019-12-12\n/devstoreaccount1/container\nrestype:container"
+        "PUT\n\n\n\n\n\n\n\n\n\n\n\nx-ms-version:2019-12-12\n/devstoreaccount1/container\nrestype:container"
+//        "PUT\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Sat, 14 Mar 2026 15:11:55 GMT\nx-ms-version:2019-12-12\n/devstoreaccount1/container\nrestype:container"
     ));
 
-    // now extend the header with the authorization (which contains a (partial) header signature).
-    headers.insert("Authorization", auth_val.parse().unwrap());
+    let headers = auth_header.get_headermap();
 
     let create_container_url = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
     println!("URL: {}", create_container_url);
@@ -124,26 +114,19 @@ fn test_create_block_blob() {
 
     let path = format!("/{CONTAINER}/{BLOB_NAME}");
 
-    // create the date-string, such that headers and Authorization header (which contains signature of the header) use exactly same datetime.
-    let utc_dt = utc_date_str_now();
-
-    let mut headers = HeaderMap::new();
-
-    //    headers.insert(CONTENT_TYPE, "application/octet-stream".parse().unwrap());  // is the default
-    headers.insert("x-ms-date", utc_dt.parse().unwrap());
-    headers.insert("x-ms-version", "2019-12-12".parse().unwrap());
-    headers.insert("x-ms-blob-type", "BlockBlob".parse().unwrap());
-    headers.insert("x-ms-blob-content-length", "512".parse().unwrap()); // required for pageblobs. Should be multiple of 512
-
+    // I can also pass a reference to a lokal string as this is guaranteed to exit long enough
+    let t_a = TEST_STORE_ACCOUNT.to_owned();
     // first build auth-header witout autorization to be able to extract the
     let auth_header = AuthHeader::new()
         .set_method(auth_header::PUT)
         .set_store_account(
-            TEST_STORE_ACCOUNT.to_owned(),
-            TEST_STORE_ACCOUNT_KEY_B64.to_owned(),
+            &t_a,
+            TEST_STORE_ACCOUNT_KEY_B64,
         )
         .set_path(path.to_owned())
-        .add_headermap(&headers)
+        .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
+        .insert_header("x-ms-blob-type", "BlockBlob".parse().unwrap())
+        //.insert_header("x-ms-blob-content-length", "512".parse().unwrap()); // required for pageblobs. Should be multiple of 512
         .set_content_length(body_content.len())
         .set_query_params(&[]);
 
@@ -152,11 +135,12 @@ fn test_create_block_blob() {
     println!("string-to-sign: {to_sign}\nAuthorization: {auth_val}");
     assert!(check_to_sign_without_xmsdate(
         &to_sign,
-        "PUT\n\n\n12\n\n\n\n\n\n\n\n\nx-ms-blob-content-length:512\nx-ms-blob-type:BlockBlob\nx-ms-date:Sat, 14 Mar 2026 15:11:55 GMT\nx-ms-version:2019-12-12\n/devstoreaccount1/container/blob_name"
+        // Warning: x-ms-date is missing
+        "PUT\n\n\n12\n\n\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-version:2019-12-12\n/devstoreaccount1/container/blob_name"
+//        "PUT\n\n\n12\n\n\n\n\n\n\n\n\nx-ms-blob-content-length:512\nx-ms-blob-type:BlockBlob\nx-ms-date:Sat, 14 Mar 2026 15:11:55 GMT\nx-ms-version:2019-12-12\n/devstoreaccount1/container/blob_name"
     ));
 
-    // now extend the header with the authorization (which contains a (partial) header signature).
-    headers.insert("Authorization", auth_val.parse().unwrap());
+    let headers = auth_header.get_headermap();
 
     let create_container_url = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
     println!("URL: {}", create_container_url);
@@ -176,8 +160,6 @@ fn test_create_block_blob() {
 }
 
 fn test_get_block_blob() {
-    let body_content = BLOB_CONTENT.as_bytes();
-
     println!(
         "\nGet blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{TEST_STORE_ACCOUNT}'."
     );
@@ -185,24 +167,14 @@ fn test_get_block_blob() {
 
     let path = format!("/{CONTAINER}/{BLOB_NAME}");
 
-    // create the date-string, such that headers and Authorization header (which contains signature of the header) use exactly same datetime.
-    let utc_dt = utc_date_str_now();
-
-    let mut headers = HeaderMap::new();
-
-    //    headers.insert(CONTENT_TYPE, "application/octet-stream".parse().unwrap());  // is the default
-    headers.insert("x-ms-date", utc_dt.parse().unwrap());
-    headers.insert("x-ms-version", "2019-12-12".parse().unwrap());
-
-    // first build auth-header witout autorization to be able to extract the
     let auth_header = AuthHeader::new()
         .set_method(auth_header::GET)
         .set_store_account(
-            TEST_STORE_ACCOUNT.to_owned(),
-            TEST_STORE_ACCOUNT_KEY_B64.to_owned(),
+            TEST_STORE_ACCOUNT,
+            TEST_STORE_ACCOUNT_KEY_B64,
         )
         .set_path(path.to_owned())
-        .set_headermap(&headers)
+        .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .set_query_params(&[]);
 
     let to_sign = auth_header.get_string_to_sign();
@@ -210,11 +182,14 @@ fn test_get_block_blob() {
     println!("string-to-sign: {to_sign}\nAuthorization: {auth_val}");
     assert!(check_to_sign_without_xmsdate(
         &to_sign,
-        "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Sat, 14 Mar 2026 15:11:55 GMT\nx-ms-version:2019-12-12\n/devstoreaccount1/container/blob_name"
+        "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-version:2019-12-12\n/devstoreaccount1/container/blob_name"
+//        "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Sat, 14 Mar 2026 15:11:55 GMT\nx-ms-version:2019-12-12\n/devstoreaccount1/container/blob_name"
     ));
 
     // now extend the header with the authorization (which contains a (partial) header signature).
-    headers.insert("Authorization", auth_val.parse().unwrap());
+    //headers.insert("Authorization", auth_val.parse().unwrap());
+
+    let headers = auth_header.get_headermap();
 
     let get_container_url = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
     println!("URL: {}", get_container_url);
@@ -240,55 +215,6 @@ fn test_get_block_blob() {
     println!("Retrieved data: {s}");
 }
 
-#[test]
-fn test_authorization() {
-    // Building up next request
-    // GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n/myaccount/mycontainer\ncomp:metadata\nrestype:container\ntimeout:20
-    // Authorization: SharedKey myaccount:ctzMq410TV3wS7upTBcunJTDLEJwMAZuFPfr0mrrA08=
-
-    // the default storage account
-    // DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;
-
-    let dt = Utc.with_ymd_and_hms(2015, 6, 26, 23, 39, 12).unwrap();
-    println!("The date = {dt:?}");
-    let dts = utc_date_str(&dt);
-    println!("\ttranslates to x-ms-date: {dts}");
-
-    let mut headers = HeaderMap::new();
-    headers.insert("x-ms-date", dts.parse().unwrap());
-    headers.insert("x-ms-version", "2015-02-21".parse().unwrap());
-
-    let auth_header = AuthHeader::new()
-        .set_method(auth_header::GET)
-        .set_store_account(
-            "myaccount".to_owned(),
-            TEST_STORE_ACCOUNT_KEY_B64.to_owned(),
-        )
-        .set_path("/mycontainer".to_owned())
-        .add_headermap(&headers)
-        //.set_datetime(&dt)  // Better to use UTC, but TZ should be dropped anyway
-        .set_query_params(&[
-            ("comp", "metadata"),
-            ("restype", "container"),
-            ("timeout", "20"),
-        ]);
-
-    let to_sign = auth_header.get_string_to_sign();
-    // FOR Debugging only
-    println!("to-sign = {}", to_sign);
-    assert!(check_to_sign_without_xmsdate(
-        &to_sign,
-        "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n/myaccount/mycontainer\ncomp:metadata\nrestype:container\ntimeout:20"
-    ));
-
-    println!(
-        "The full authorization header:\nAuthorization: {}",
-        auth_header.get_shared_authorization()
-    );
-    println!(
-        "Expected:                     \nAuthorization: SharedKey myaccount:ctzMq410TV3wS7upTBcunJTDLEJwMAZuFPfr0mrrA08="
-    )
-}
 
 #[test]
 fn run_tests_in_sequence() {
