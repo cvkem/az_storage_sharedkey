@@ -13,5 +13,5 @@ In order to run the program you first need to start the Azurate-emulator via sou
 $ source start-azurite.sh
 ```
 
-The script assumes that you have `podman` installed, but changing to 'docker' is easy.
+The script assumes that you have `podman` installed, but changing to `docker` is easy.
 

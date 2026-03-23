@@ -22,41 +22,6 @@ const CONTAINER: &str = "container";
 const BLOB_NAME: &str = "blob_name";
 const BLOB_CONTENT: &str = "Hello world!";
 
-fn compare_strings(to_sign: &str, expect: &str) {
-    println!("\nCompare the strings 'to_sign' and 'expected'");
-    to_sign
-        .chars()
-        .zip(expect.chars())
-        .enumerate()
-        .for_each(|(idx, (t, s))| {
-            println!(
-                "{idx}:  {t}  -  {s}     {}",
-                if s != t { "FAILED" } else { "" }
-            )
-        });
-    println!(
-        "Lengths  to_sign: {}  expect: {}",
-        to_sign.len(),
-        expect.len()
-    );
-}
-
-fn check_to_sign_without_xmsdate(to_sign: &str, expect: &str) -> bool {
-    use regex::Regex;
-
-    let replacement = "x-ms-date:DDD, DD MMM YYYY HH:MM:SS GMT";
-    let re = Regex::new(r"x-ms-date:\w{3}, \d{2} \w{3} \d{4} \d{2}:\d{2}:\d{2} GMT").unwrap();
-    let to_sign = re.replace(to_sign, replacement);
-    let expect = re.replace(expect, replacement);
-
-    let matching = to_sign == expect;
-    println!(" expected: {expect}\nmatch: {}", matching);
-    if !matching {
-        compare_strings(&to_sign, &expect);
-    }
-    matching
-}
-
 fn test_create_container() {
     println!("\nCreate container {CONTAINER} in store-account {TEST_STORE_ACCOUNT}");
     let client = blocking::Client::new();
@@ -65,7 +30,7 @@ fn test_create_container() {
 
     let query_pars = [("restype", "container")];
     // first build auth-header witout autorization to be able to extract the
-    let auth_header = AuthHeader::new()
+    let mut sr = AuthHeader::new()
         .set_method(auth_header::PUT)
         .set_store_account(
             TEST_STORE_ACCOUNT,
@@ -73,20 +38,18 @@ fn test_create_container() {
         )
         .set_path(path.to_owned())
         .set_query_params(&query_pars)
-        .insert_header("x-ms-version", "2019-12-12".parse().unwrap());
+        .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
+        .build();
 
-    let to_sign = auth_header.get_string_to_sign();
-    let auth_val = auth_header.get_shared_authorization();
-    println!("string-to-sign: {to_sign}\nAuthorization: {auth_val}");
-    assert!(check_to_sign_without_xmsdate(
-        &to_sign,
-        "PUT\n\n\n\n\n\n\n\n\n\n\n\nx-ms-version:2019-12-12\n/devstoreaccount1/container\nrestype:container"
-//        "PUT\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Sat, 14 Mar 2026 15:11:55 GMT\nx-ms-version:2019-12-12\n/devstoreaccount1/container\nrestype:container"
-    ));
 
-    let headers = auth_header.get_headermap();
+    let headers = sr.extract_headermap();
+    let query_pars = sr.get_query_params();
 
-    let create_container_url = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
+    let create_container_url_org = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
+    let create_container_url = sr.get_url();
+
+    assert!(create_container_url == create_container_url_org, "mismatch in urls");
+
     println!("URL: {}", create_container_url);
     let res = client
         .put(create_container_url)
@@ -117,7 +80,7 @@ fn test_create_block_blob() {
     // I can also pass a reference to a lokal string as this is guaranteed to exit long enough
     let t_a = TEST_STORE_ACCOUNT.to_owned();
     // first build auth-header witout autorization to be able to extract the
-    let auth_header = AuthHeader::new()
+    let mut sr = AuthHeader::new()
         .set_method(auth_header::PUT)
         .set_store_account(
             &t_a,
@@ -128,22 +91,18 @@ fn test_create_block_blob() {
         .insert_header("x-ms-blob-type", "BlockBlob".parse().unwrap())
         //.insert_header("x-ms-blob-content-length", "512".parse().unwrap()); // required for pageblobs. Should be multiple of 512
         .set_content_length(body_content.len())
-        .set_query_params(&[]);
+        .set_query_params(&[])
+        .build();
 
-    let to_sign = auth_header.get_string_to_sign();
-    let auth_val = auth_header.get_shared_authorization();
-    println!("string-to-sign: {to_sign}\nAuthorization: {auth_val}");
-    assert!(check_to_sign_without_xmsdate(
-        &to_sign,
-        // Warning: x-ms-date is missing
-        "PUT\n\n\n12\n\n\n\n\n\n\n\n\nx-ms-blob-type:BlockBlob\nx-ms-version:2019-12-12\n/devstoreaccount1/container/blob_name"
-//        "PUT\n\n\n12\n\n\n\n\n\n\n\n\nx-ms-blob-content-length:512\nx-ms-blob-type:BlockBlob\nx-ms-date:Sat, 14 Mar 2026 15:11:55 GMT\nx-ms-version:2019-12-12\n/devstoreaccount1/container/blob_name"
-    ));
 
-    let headers = auth_header.get_headermap();
+    let headers = sr.extract_headermap();
 
-    let create_container_url = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
+    let create_container_url_org = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
+    let create_container_url = sr.get_url();
     println!("URL: {}", create_container_url);
+
+    assert!(create_container_url == create_container_url_org, "mismatch in urls");
+
     let res = client
         .put(create_container_url)
         .headers(headers)
@@ -167,7 +126,7 @@ fn test_get_block_blob() {
 
     let path = format!("/{CONTAINER}/{BLOB_NAME}");
 
-    let auth_header = AuthHeader::new()
+    let mut sr = AuthHeader::new()
         .set_method(auth_header::GET)
         .set_store_account(
             TEST_STORE_ACCOUNT,
@@ -175,24 +134,18 @@ fn test_get_block_blob() {
         )
         .set_path(path.to_owned())
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
-        .set_query_params(&[]);
+        .set_query_params(&[])
+        .build();
 
-    let to_sign = auth_header.get_string_to_sign();
-    let auth_val = auth_header.get_shared_authorization();
-    println!("string-to-sign: {to_sign}\nAuthorization: {auth_val}");
-    assert!(check_to_sign_without_xmsdate(
-        &to_sign,
-        "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-version:2019-12-12\n/devstoreaccount1/container/blob_name"
-//        "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Sat, 14 Mar 2026 15:11:55 GMT\nx-ms-version:2019-12-12\n/devstoreaccount1/container/blob_name"
-    ));
 
-    // now extend the header with the authorization (which contains a (partial) header signature).
-    //headers.insert("Authorization", auth_val.parse().unwrap());
+    let headers = sr.extract_headermap();
 
-    let headers = auth_header.get_headermap();
+    let get_container_url_org = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
+    let get_container_url = sr.get_url();
 
-    let get_container_url = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
     println!("URL: {}", get_container_url);
+    assert!(get_container_url_org == get_container_url, "Mismatch in urls for '{get_container_url}'");
+
     let res = client.get(get_container_url).headers(headers).send();
 
     println!("The GET-response: {res:?}");

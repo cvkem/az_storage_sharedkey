@@ -3,11 +3,16 @@ use crate::date::utc_date_str;
 use super::hmac_sha256;
 use reqwest::header::{HeaderMap, IntoHeaderName, HeaderValue};
 use chrono::{DateTime, TimeZone, Utc};
-use urlencoding::decode;
+use crate::storage_request::StorageRequest;
 
 use super::GET;
 
-const MSDATE_kEY: &str = "x-ms-date";
+const MSDATE_KEY: &str = "x-ms-date";
+
+const PROTOCOL: &str = "http";
+const BLOB_SERVICE: &str = "azurite.local:10000";
+
+
 
 pub struct AuthHeader<'a> {
     method: &'static str,
@@ -19,7 +24,7 @@ pub struct AuthHeader<'a> {
     // headers: Vec<(String, String)>,
     headermap: Option<HeaderMap>,
     query_params: Option<Vec<(String, String)>>,
-    content_length: String,
+    content_length: Option<usize>,
 }
 
 impl<'a> Default for AuthHeader<'a> {
@@ -40,10 +45,11 @@ impl<'a> AuthHeader<'a> {
             // headers: Vec::new(),
             headermap: None,
             query_params: None,
-            content_length: "".to_owned(),
+            content_length: None,
         }
     }
 
+    /// set the datetime of the request. The DateTime<T> is translated to UTC time, as this is needed for the header.
     pub fn set_datetime<T>(mut self, dt: DateTime<T>) -> Self 
         where T: TimeZone {
         self.datetime = Some(dt.to_utc());
@@ -52,7 +58,8 @@ impl<'a> AuthHeader<'a> {
 
     /// get the string that needs to be signed to get the authorization-header.
     /// However, beware that header 'x-ms-date' still might be missing as that is added last-minute)
-    pub fn get_string_to_sign(&self) -> String {
+    /// used for internal purposes only. 
+    fn get_string_to_sign(&self) -> String {
         // draw an array of 'x-ms-...'  headers and sort them on the key.
         let mut ms_headers: Vec<_> = self
             .headermap
@@ -73,7 +80,7 @@ impl<'a> AuthHeader<'a> {
         let mut to_sign = format!(
             "{}\n\n\n{}\n\n\n\n\n\n\n\n\n{}/{}{}",
             self.method,
-            self.content_length,
+            self.content_length.map_or("".to_owned(), |x| x.to_string()),
             ms_headers,
             self.store_account
                 .as_ref()
@@ -95,9 +102,7 @@ impl<'a> AuthHeader<'a> {
         to_sign
     }
 
-    pub fn get_shared_authorization(&self) -> String {
-        let to_sign = self.get_string_to_sign();
-
+    fn get_shared_authorization(&self, to_sign: &str) -> String {
         let signed = hmac_sha256::get_hmac_b64(&self.store_account_key, &to_sign);
 
         let shared_auth = format!(
@@ -127,20 +132,10 @@ impl<'a> AuthHeader<'a> {
     }
 
     pub fn set_content_length(mut self, len: usize) -> Self {
-        self.content_length = format!("{len}");
+        self.content_length = Some(len);
         self
     }
 
-    // pub fn set_datetime<T: TimeZone>(mut self, dt: &DateTime<T>) -> Self {
-    //     self.utc_date_str = Some(utc_date_str(dt));
-    //     self
-    // }
-
-    // // assume the date_str
-    // pub fn set_datetime_str(mut self, utc_date_str: String) -> Self {
-    //     self.utc_date_str = Some(utc_date_str);
-    //     self
-    // }
 
     // set_query_paramters assumes the query parameters do not have redundant whitespace, are url-decoded and parameter-names are in lower-case.
     // In case of multiple parameter-values the values should be ordered!
@@ -155,34 +150,12 @@ impl<'a> AuthHeader<'a> {
         self
     }
 
-    // // collect the x-ms- headers, order them, url-decode them  and add these to the vectors with ms_headers and headers based on the key-prefix.
-    // pub fn add_headermap(mut self, headers: &HeaderMap) -> Self {
-    //     headers
-    //         .iter()
-    //         .map(|(key, val)| {
-    //             (
-    //                 decode(key.as_str()).expect("UTF-8 key").into_owned(),
-    //                 decode(val.to_str().unwrap())
-    //                     .expect("UFT-8 value")
-    //                     .into_owned(),
-    //             )
-    //         })
-    //         .map(|(k, v)| (k.to_string(), v.to_string()))
-    //         .for_each(|kv| {
-    //             if kv.0.as_str().starts_with("x-ms-") {
-    //                 self.ms_headers.push(kv);
-    //             } else {
-    //                 self.headers.push(kv);
-    //             }
-    //         });
-    //     self
-    // }
 
     /// Insert the (key, value) as a header in the headermap, creating an empty headermap if none exists yet.
     pub fn insert_header<K>(mut self, key: K, value: HeaderValue) -> Self 
         where K: IntoHeaderName + ToString {
         // using to_string as
-        assert!(key.to_string() != MSDATE_kEY, "Use the method 'self.set_date(...) to add a date to the headers." );
+        assert!(key.to_string() != MSDATE_KEY, "Use the method 'self.set_date(...) to add a date to the headers." );
 //        self.headermap = self.headermap.or(Some(HeaderMap::new()));
 
         self
@@ -193,8 +166,13 @@ impl<'a> AuthHeader<'a> {
         self
     }
 
-    /// get the existing headermap and extend it with the with an x-ms-date and an Autorization field.
-    pub fn get_headermap(mut self) -> HeaderMap {
+    /// Build a 'StorageRequest' object based on the current input in the 'AuthHeader'.
+    /// During the build phase the headermap is extended with a x-ms-date and an 'Authorization' header.
+    pub fn build(mut self) -> StorageRequest {
+        let url = format!("{PROTOCOL}://{}.{BLOB_SERVICE}{}", 
+            self.store_account.as_ref().expect("Set storage account via 'set_storage_account' before building the request"), 
+            self.path.as_ref().expect("Set path-parameters via 'set_path' before building the request."));
+
         // add missing headers needed to compute the shared-key
         {
             let hm = self
@@ -202,45 +180,17 @@ impl<'a> AuthHeader<'a> {
                 .get_or_insert(HeaderMap::new());
 
             let datetime_str = utc_date_str(&self.datetime.unwrap_or(Utc::now()));
-            hm.insert(MSDATE_kEY, HeaderValue::from_str(&datetime_str).unwrap());
+            hm.insert(MSDATE_KEY, HeaderValue::from_str(&datetime_str).unwrap());
             // add content length !!
         }
-        let auth_val = self.get_shared_authorization();
+        let to_sign = self.get_string_to_sign();
+        let auth_val = self.get_shared_authorization(&to_sign);
 
         let mut hm = self.headermap.expect("No headermap present. Insert value with 'insert_header'.");
 
         hm.insert("Authorization", auth_val.parse().unwrap());
 
-        hm
+        StorageRequest::new(url, self.query_params, to_sign, hm)
     }
 
-    // // clearn the collected headers and replace them with headers from the headersmap
-    // pub fn set_headermap(mut self, headers: &HeaderMap) -> Self {
-    //     self.ms_headers.clear();
-    //     self.headers.clear();
-
-    //     self.add_headermap(headers)
-    // }
-
-    // // add the header to the righ queue
-    // pub fn add_header(mut self, k: String, v: String) -> Self {
-    //     if k.starts_with("x-ms-") {
-    //         self.ms_headers.push((k, v))
-    //     } else {
-    //         self.headers.push((k, v))
-    //     }
-    //     self
-    // }
-
-    // pub fn get_headermap(&self) -> HeaderMap {
-    //     let mut hm = HeaderMap::new();
-
-    //     self.headers.iter().for_each(|(k, v)| {
-    //         let _ = hm.append(
-    //             HeaderName::from_bytes(k.as_bytes()).unwrap(),
-    //             v.to_owned().parse().unwrap(),
-    //         );
-    //     });
-    //     hm
-    // }
 }
