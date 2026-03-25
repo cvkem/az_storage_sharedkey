@@ -1,10 +1,7 @@
-//#[cfg(test)]
-use crate::{
-    auth_header::{self, AuthHeader}
-};
-
-use chrono::{TimeZone, Utc};
+use az_storage_sharedkey::auth_header::{self, AuthHeader};
 use reqwest::{blocking};
+
+
 
 // default account and key based on:
 //  https://docs.azure.cn/en-us/storage/common/storage-connect-azurite?tabs=blob-storage
@@ -36,6 +33,7 @@ fn test_create_container() {
             TEST_STORE_ACCOUNT,
             TEST_STORE_ACCOUNT_KEY_B64,
         )
+        .set_dns_suffix(BLOB_SERVICE)
         .set_path(path.to_owned())
         .set_query_params(&query_pars)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
@@ -86,6 +84,7 @@ fn test_create_block_blob() {
             &t_a,
             TEST_STORE_ACCOUNT_KEY_B64,
         )
+        .set_dns_suffix(BLOB_SERVICE)
         .set_path(path.to_owned())
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .insert_header("x-ms-blob-type", "BlockBlob".parse().unwrap())
@@ -132,6 +131,7 @@ fn test_get_block_blob() {
             TEST_STORE_ACCOUNT,
             TEST_STORE_ACCOUNT_KEY_B64,
         )
+        .set_dns_suffix(BLOB_SERVICE)
         .set_path(path.to_owned())
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .set_query_params(&[])

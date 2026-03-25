@@ -10,42 +10,39 @@ use super::GET;
 const MSDATE_KEY: &str = "x-ms-date";
 
 const PROTOCOL: &str = "http";
-const BLOB_SERVICE: &str = "azurite.local:10000";
 
 
-
-pub struct AuthHeader<'a> {
+#[derive(Clone)]
+pub struct AuthHeader<'a,'b> {
     method: &'static str,
     store_account: Option<&'a str>,
     store_account_key: &'a str,
+    dns_suffix: Option<&'b str>,
     path: Option<String>,
     datetime: Option<DateTime<Utc>>,
-    // ms_headers: Vec<(String, String)>,
-    // headers: Vec<(String, String)>,
     headermap: Option<HeaderMap>,
     query_params: Option<Vec<(String, String)>>,
-    content_length: Option<usize>,
+    content_length: usize,
 }
 
-impl<'a> Default for AuthHeader<'a> {
+impl<'a,'b> Default for AuthHeader<'a,'b> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> AuthHeader<'a> {
+impl<'a,'b> AuthHeader<'a,'b> {
     pub fn new() -> Self {
         AuthHeader {
             method: GET,
             store_account: None,
             store_account_key: "",
+            dns_suffix: None,
             path: None,
             datetime: None,
-            // ms_headers: Vec::new(),
-            // headers: Vec::new(),
             headermap: None,
             query_params: None,
-            content_length: None,
+            content_length: 0,
         }
     }
 
@@ -72,7 +69,23 @@ impl<'a> AuthHeader<'a> {
             .collect();
         ms_headers.sort_by(|a, b| a.0.cmp(&b.0));
 
-        let ms_headers = ms_headers
+        // source of specifications: https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#blob-queue-and-file-services-shared-key-authorization
+        // GET\n /*HTTP Verb*/  
+        // \n    /*Content-Encoding*/  
+        // \n    /*Content-Language*/  
+        // \n    /*Content-Length (empty string when zero)*/  
+        // \n    /*Content-MD5*/  
+        // \n    /*Content-Type*/  
+        // \n    /*Date*/  
+        // \n    /*If-Modified-Since */  
+        // \n    /*If-Match*/  
+        // \n    /*If-None-Match*/  
+        // \n    /*If-Unmodified-Since*/  
+        // \n    /*Range*/  
+        // x-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n    /*CanonicalizedHeaders*/  
+        // /myaccount /mycontainer\ncomp:metadata\nrestype:container\ntimeout:20    /*CanonicalizedResource*/  
+
+        let ms_header_str = ms_headers
             .iter()
             .map(|(k, v)| format!("{k}:{v}\n"))
             .collect::<Vec<_>>()
@@ -80,8 +93,8 @@ impl<'a> AuthHeader<'a> {
         let mut to_sign = format!(
             "{}\n\n\n{}\n\n\n\n\n\n\n\n\n{}/{}{}",
             self.method,
-            self.content_length.map_or("".to_owned(), |x| x.to_string()),
-            ms_headers,
+            if self.content_length > 0 { self.content_length.to_string()} else { "".to_owned() },
+            ms_header_str,
             self.store_account
                 .as_ref()
                 .expect("use set_store_account to set the storage account"),
@@ -126,18 +139,23 @@ impl<'a> AuthHeader<'a> {
         self
     }
 
+    pub fn set_dns_suffix(mut self, dns_suffix: &'b str) -> Self {
+        self.dns_suffix = Some(dns_suffix);
+        self
+    }
+
     pub fn set_path(mut self, path: String) -> Self {
         self.path = Some(path);
         self
     }
 
     pub fn set_content_length(mut self, len: usize) -> Self {
-        self.content_length = Some(len);
+        self.content_length = len;
         self
     }
 
 
-    // set_query_paramters assumes the query parameters do not have redundant whitespace, are url-decoded and parameter-names are in lower-case.
+    // set_query_parameters assumes the query parameters do not have redundant whitespace, are url-decoded and parameter-names are in lower-case.
     // In case of multiple parameter-values the values should be ordered!
     // source: https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-headers-string
     pub fn set_query_params(mut self, qp: &[(&str, &str)]) -> Self {
@@ -155,7 +173,11 @@ impl<'a> AuthHeader<'a> {
     pub fn insert_header<K>(mut self, key: K, value: HeaderValue) -> Self 
         where K: IntoHeaderName + ToString {
         // using to_string as
-        assert!(key.to_string() != MSDATE_KEY, "Use the method 'self.set_date(...) to add a date to the headers." );
+        {
+            let key_str = key.to_string();
+            assert!(key_str != MSDATE_KEY, "Use the method 'self.set_date(...) to add a date-headers." );
+            assert!(key_str != reqwest::header::CONTENT_LENGTH.as_str(), "Use the method 'self.set_content_length(...) to add a content-length header." );
+        }
 //        self.headermap = self.headermap.or(Some(HeaderMap::new()));
 
         self
@@ -169,8 +191,9 @@ impl<'a> AuthHeader<'a> {
     /// Build a 'StorageRequest' object based on the current input in the 'AuthHeader'.
     /// During the build phase the headermap is extended with a x-ms-date and an 'Authorization' header.
     pub fn build(mut self) -> StorageRequest {
-        let url = format!("{PROTOCOL}://{}.{BLOB_SERVICE}{}", 
-            self.store_account.as_ref().expect("Set storage account via 'set_storage_account' before building the request"), 
+        let url = format!("{PROTOCOL}://{}.{}{}", 
+            self.store_account.as_ref().expect("Set storage-account via 'set_storage_account' before building the request"),
+            self.dns_suffix.as_ref().expect("Set the dns-suffix via 'set_dns_suffix' before building the request"),
             self.path.as_ref().expect("Set path-parameters via 'set_path' before building the request."));
 
         // add missing headers needed to compute the shared-key
@@ -181,6 +204,10 @@ impl<'a> AuthHeader<'a> {
 
             let datetime_str = utc_date_str(&self.datetime.unwrap_or(Utc::now()));
             hm.insert(MSDATE_KEY, HeaderValue::from_str(&datetime_str).unwrap());
+
+            if self.content_length > 0 {
+                 hm.insert(reqwest::header::CONTENT_LENGTH , self.content_length.to_string().parse().unwrap());
+            } 
             // add content length !!
         }
         let to_sign = self.get_string_to_sign();
@@ -188,7 +215,7 @@ impl<'a> AuthHeader<'a> {
 
         let mut hm = self.headermap.expect("No headermap present. Insert value with 'insert_header'.");
 
-        hm.insert("Authorization", auth_val.parse().unwrap());
+        hm.insert(reqwest::header::AUTHORIZATION , auth_val.parse().unwrap());
 
         StorageRequest::new(url, self.query_params, to_sign, hm)
     }

@@ -5,6 +5,8 @@ pub const GET: &str = "GET";
 pub const PUT: &str = "PUT";
 pub const POST: &str = "POST";
 
+
+
 pub use auth_header::AuthHeader;
 
 
@@ -13,7 +15,7 @@ mod test {
 
     use crate::{
     auth_header::{self, AuthHeader},
-    date::{utc_date_str, utc_date_str_now},
+    //date::{utc_date_str, utc_date_str_now},
     };
 
     use chrono::{TimeZone, Utc};
@@ -25,6 +27,8 @@ mod test {
     const CONTAINER: &str = "container";
     const BLOB_NAME: &str = "blob_name";
     const BLOB_CONTENT: &str = "Hello world!";
+
+    const BLOB_SERVICE: &str = "blob.local";
 
 
 
@@ -82,6 +86,7 @@ mod test {
                 "myaccount",
                 TEST_STORE_ACCOUNT_KEY_B64,
             )
+            .set_dns_suffix(BLOB_SERVICE)
             .set_path("/mycontainer".to_owned())
             .set_datetime(dt)
             .insert_header("x-ms-version", "2015-02-21".parse().unwrap())
@@ -119,6 +124,7 @@ mod test {
                 TEST_STORE_ACCOUNT,
                 TEST_STORE_ACCOUNT_KEY_B64,
             )
+            .set_dns_suffix(BLOB_SERVICE)
             .set_path(path.to_owned())
             .set_query_params(&query_pars)
             .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
@@ -150,6 +156,7 @@ mod test {
                 &t_a,
                 TEST_STORE_ACCOUNT_KEY_B64,
             )
+            .set_dns_suffix(BLOB_SERVICE)
             .set_path(path.to_owned())
             .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
             .insert_header("x-ms-blob-type", "BlockBlob".parse().unwrap())
@@ -176,6 +183,7 @@ mod test {
         let path = format!("/{CONTAINER}/{BLOB_NAME}");
 
         let sr = AuthHeader::new()
+            .set_dns_suffix(BLOB_SERVICE)
             .set_method(auth_header::GET)
             .set_store_account(
                 TEST_STORE_ACCOUNT,
