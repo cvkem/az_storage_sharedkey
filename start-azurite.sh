@@ -14,6 +14,7 @@ echo "    Account key: Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz
 echo
 echo "Find the container-id: podman ps" 
 echo "Exec shell in container: podman exec -it 996c81dc00ab /bin/sh"
+echo "Or else: podman exec -it $(podman ps |grep azurite |cut -d " " -f 1) /bin/sh"
 echo "watch logs:   tail -f /tmp/debug.log" 
 echo
 
