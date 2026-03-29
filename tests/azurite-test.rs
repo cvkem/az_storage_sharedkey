@@ -1,4 +1,7 @@
-use az_storage_sharedkey::auth_header::{self, AuthHeader};
+use az_storage_sharedkey::{
+    auth_header::{self, AuthHeader},
+    body::Body,
+};
 use reqwest::{blocking};
 
 
@@ -89,7 +92,7 @@ fn test_create_block_blob() {
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .insert_header("x-ms-blob-type", "BlockBlob".parse().unwrap())
         //.insert_header("x-ms-blob-content-length", "512".parse().unwrap()); // required for pageblobs. Should be multiple of 512
-        .set_content_length(body_content.len())
+            .set_body(Body::Bytes(body_content))
         .set_query_params(&[])
         .build();
 

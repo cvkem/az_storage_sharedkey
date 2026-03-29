@@ -8,17 +8,20 @@ pub const POST: &str = "POST";
 
 
 pub use auth_header::AuthHeader;
+pub const MSDATE_KEY: &str = "x-ms-date";
+
 
 
 #[cfg(test)]
 mod test {
 
     use crate::{
-    auth_header::{self, AuthHeader},
-    //date::{utc_date_str, utc_date_str_now},
+        auth_header::{self, AuthHeader},
+        body::Body,
     };
 
     use chrono::{TimeZone, Utc};
+    use reqwest::header::HeaderName;
 
     const TEST_STORE_ACCOUNT: &str = "devstoreaccount1";
     const TEST_STORE_ACCOUNT_KEY_B64: &str =
@@ -67,9 +70,87 @@ mod test {
         matching
     }
 
+    
+    #[test]
+    #[should_panic(expected = "Use the method 'self.set_date(...)' to add a date-headers.")]
+    fn test_no_x_ms_date_header() {
+        let _auth_header = AuthHeader::new()
+            .insert_header(auth_header::MSDATE_KEY, "2015-02-21".parse().unwrap());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_no_content_length_header() {
+        let _auth_header = AuthHeader::new()
+            .insert_header(reqwest::header::CONTENT_LENGTH.as_str(), "123".parse().unwrap());
+    }
+
+    #[test]
+    fn test_add_body_and_extract_it() {
+        let body = "abc";
+        let sr = AuthHeader::new()
+            .set_store_account(
+                "myaccount",
+                TEST_STORE_ACCOUNT_KEY_B64,
+            )
+            .set_dns_suffix(BLOB_SERVICE)
+//            .set_path("/mycontainer".to_owned())
+//            .insert_header("x-ms-version", "2015-02-21".parse().unwrap())
+            .set_body(Body::Text(body))
+            .build();
+
+        let body_ref = sr.body_as_bytes();
+        let body_ref2 = sr.body_as_bytes();
+        assert!(str::from_utf8(body_ref.unwrap()).unwrap() == body, "Extracted body should match the original body passed as input");
+        assert!(str::from_utf8(body_ref2.unwrap()).unwrap() == body, "Extracted body should match the original body passed as input");
+    }
+
+
+
 
     #[test]
     fn test_string_to_sign() {
+        // Building up next request
+        // GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n/myaccount/mycontainer\ncomp:metadata\nrestype:container\ntimeout:20
+        // Authorization: SharedKey myaccount:ctzMq410TV3wS7upTBcunJTDLEJwMAZuFPfr0mrrA08=
+
+        // the default storage account
+        // DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;
+
+        let dt = Utc.with_ymd_and_hms(2015, 6, 26, 23, 39, 12).unwrap();
+        println!("The date = {dt:?}");
+
+        let storage_request = AuthHeader::new()
+            .set_method(auth_header::GET)
+            .set_store_account(
+                "myaccount",
+                TEST_STORE_ACCOUNT_KEY_B64,
+            )
+            .set_dns_suffix(BLOB_SERVICE)
+            .set_path("/mycontainer".to_owned())
+            .set_datetime(dt)
+            .insert_header("x-ms-version", "2015-02-21".parse().unwrap())
+            .set_query_params(&[
+                ("comp", "metadata"),
+                ("restype", "container"),
+                ("timeout", "20"),
+            ])
+            .build();
+
+
+        let to_sign = storage_request.get_unsigned_authorization();
+        // FOR Debugging only
+        println!("to-sign = {}", to_sign);
+
+        // comparison withou field 'x-ms-date'
+        assert!(check_to_sign_without_xmsdate(to_sign, "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n/myaccount/mycontainer\ncomp:metadata\nrestype:container\ntimeout:20"),
+          "The string to sign is '{to_sign}'"
+    )
+
+    }
+
+        #[test]
+    fn test_string_to_sign_full() {
         // Building up next request
         // GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n/myaccount/mycontainer\ncomp:metadata\nrestype:container\ntimeout:20
         // Authorization: SharedKey myaccount:ctzMq410TV3wS7upTBcunJTDLEJwMAZuFPfr0mrrA08=
@@ -89,7 +170,13 @@ mod test {
             .set_dns_suffix(BLOB_SERVICE)
             .set_path("/mycontainer".to_owned())
             .set_datetime(dt)
+            .set_content_length_without_body(123)
             .insert_header("x-ms-version", "2015-02-21".parse().unwrap())
+            .insert_header(reqwest::header::CONTENT_ENCODING, "gzip".parse().unwrap())
+            .insert_header(reqwest::header::CONTENT_LANGUAGE, "nl-NL".parse().unwrap())
+            .insert_header(&HeaderName::from_static("content_md5"), "1a2b3c".parse().unwrap())
+            .insert_header(reqwest::header::CONTENT_TYPE, "application/octet-stream".parse().unwrap())
+            
             .set_query_params(&[
                 ("comp", "metadata"),
                 ("restype", "container"),
@@ -103,7 +190,7 @@ mod test {
         println!("to-sign = {}", to_sign);
 
         // comparison withou field 'x-ms-date'
-        assert!(check_to_sign_without_xmsdate(to_sign, "GET\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n/myaccount/mycontainer\ncomp:metadata\nrestype:container\ntimeout:20"),
+        assert!(check_to_sign_without_xmsdate(to_sign, "GET\ngzip\nnl-NL\n123\n1a2b3c\napplication/octet-stream\n\n\n\n\n\n\nx-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n/myaccount/mycontainer\ncomp:metadata\nrestype:container\ntimeout:20"),
           "The string to sign is '{to_sign}'"
     )
 
@@ -140,7 +227,7 @@ mod test {
 
     #[test]
     fn test_create_block_blob_sign_string() {
-        let body_content = BLOB_CONTENT.as_bytes();
+        let body_content = BLOB_CONTENT;
         println!(
             "\nCheck sign-string for Create blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{TEST_STORE_ACCOUNT}'."
         );
@@ -160,8 +247,7 @@ mod test {
             .set_path(path.to_owned())
             .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
             .insert_header("x-ms-blob-type", "BlockBlob".parse().unwrap())
-            //.insert_header("x-ms-blob-content-length", "512".parse().unwrap()); // required for pageblobs. Should be multiple of 512
-            .set_content_length(body_content.len())
+            .set_body(Body::Text(body_content))
             .set_query_params(&[])
             .build();
 
