@@ -40,6 +40,8 @@ fn test_create_container() {
         .set_path(path.to_owned())
         .set_query_params(&query_pars)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
+//        .insert_header("x-ms-version", "2026-02-06".parse().unwrap())   // this version is not yet supported by Azurite (2026-03-29)
+//                                                                           see: https://learn.microsoft.com/en-us/rest/api/storageservices/versioning-for-the-azure-storage-services
         .build();
 
 

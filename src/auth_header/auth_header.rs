@@ -211,6 +211,7 @@ impl<'a,'b,'c> AuthHeader<'a,'b,'c> {
             let key_str = key.to_string();
             assert!(key_str != super::MSDATE_KEY, "Use the method 'self.set_date(...)' to add a date-headers.");
             assert!(key_str != reqwest::header::CONTENT_LENGTH.as_str(), "Use the method 'self.set_body(...) which does calculate and add a content-length to the headers." );
+            assert!(key_str != reqwest::header::AUTHORIZATION.as_str(), "This library will compute the shared-key based on url and query-parameters, so this header is auto-generated");
         }
 //        self.headermap = self.headermap.or(Some(HeaderMap::new()));
 
