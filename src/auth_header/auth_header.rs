@@ -106,13 +106,19 @@ impl<'a,'b,'c> AuthHeader<'a,'b,'c> {
         // /myaccount /mycontainer\ncomp:metadata\nrestype:container\ntimeout:20    /*CanonicalizedResource*/ 
 
             let mut to_sign = format!(
-            "{}\n{}\n{}\n{}\n{}\n{}\n\n\n\n\n\n\n{}/{}{}",
+            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}/{}{}",
             self.method,
             self.get_header_value(&reqwest::header::CONTENT_ENCODING),
             self.get_header_value(&reqwest::header::CONTENT_LANGUAGE),            
             if self.content_length > 0 { self.content_length.to_string()} else { "".to_owned() },
             self.get_header_value(&HeaderName::from_static("content_md5")),            
-            self.get_header_value(&reqwest::header::CONTENT_TYPE),            
+            self.get_header_value(&reqwest::header::CONTENT_TYPE),
+            self.get_header_value(&reqwest::header::DATE),  
+            self.get_header_value(&reqwest::header::IF_MODIFIED_SINCE), 
+            self.get_header_value(&reqwest::header::IF_MATCH),     
+            self.get_header_value(&reqwest::header::IF_NONE_MATCH),     
+            self.get_header_value(&reqwest::header::IF_UNMODIFIED_SINCE), 
+            self.get_header_value(&reqwest::header::RANGE), 
             ms_header_str,
             self.store_account
                 .as_ref()

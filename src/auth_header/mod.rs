@@ -176,7 +176,12 @@ mod test {
             .insert_header(reqwest::header::CONTENT_LANGUAGE, "nl-NL".parse().unwrap())
             .insert_header(&HeaderName::from_static("content_md5"), "1a2b3c".parse().unwrap())
             .insert_header(reqwest::header::CONTENT_TYPE, "application/octet-stream".parse().unwrap())
-            
+            .insert_header(reqwest::header::DATE, "Tue, 29 Oct 2024 16:56:32 GMT".parse().unwrap())
+            .insert_header(reqwest::header::IF_MODIFIED_SINCE, "Wed, 21 Oct 2015 07:28:00 GMT".parse().unwrap())       
+            .insert_header(reqwest::header::IF_MATCH, "\"67ab43\"".parse().unwrap())       
+            .insert_header(reqwest::header::IF_NONE_MATCH, "\"abc\"".parse().unwrap())       
+            .insert_header(reqwest::header::IF_UNMODIFIED_SINCE, "Wed, 14 Oct 2015 08:29:00 GMT".parse().unwrap())       
+            .insert_header(reqwest::header::RANGE, "bytes=500-999".parse().unwrap())       
             .set_query_params(&[
                 ("comp", "metadata"),
                 ("restype", "container"),
@@ -190,7 +195,7 @@ mod test {
         println!("to-sign = {}", to_sign);
 
         // comparison withou field 'x-ms-date'
-        assert!(check_to_sign_without_xmsdate(to_sign, "GET\ngzip\nnl-NL\n123\n1a2b3c\napplication/octet-stream\n\n\n\n\n\n\nx-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n/myaccount/mycontainer\ncomp:metadata\nrestype:container\ntimeout:20"),
+        assert!(check_to_sign_without_xmsdate(to_sign, "GET\ngzip\nnl-NL\n123\n1a2b3c\napplication/octet-stream\nTue, 29 Oct 2024 16:56:32 GMT\nWed, 21 Oct 2015 07:28:00 GMT\n\"67ab43\"\n\"abc\"\nWed, 14 Oct 2015 08:29:00 GMT\nbytes=500-999\nx-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n/myaccount/mycontainer\ncomp:metadata\nrestype:container\ntimeout:20"),
           "The string to sign is '{to_sign}'"
     )
 
