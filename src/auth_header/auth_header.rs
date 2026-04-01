@@ -259,7 +259,7 @@ impl<'a,'b,'c> AuthHeader<'a,'b,'c> {
 
         hm.insert(reqwest::header::AUTHORIZATION , auth_val.parse().unwrap());
 
-        StorageRequest::new(url, self.query_params, to_sign, hm, self.body)
+        StorageRequest::new(self.method, url, self.query_params, to_sign, hm, self.body)
     }
 
 }

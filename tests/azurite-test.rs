@@ -171,6 +171,45 @@ fn test_get_block_blob() {
     println!("Retrieved data: {s}");
 }
 
+
+fn test_exec_get_block_blob() {
+    println!(
+        "\nGet blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{TEST_STORE_ACCOUNT}'."
+    );
+    let res = AuthHeader::new()
+        .set_method(Method::Get)
+        .set_store_account(
+            TEST_STORE_ACCOUNT,
+            TEST_STORE_ACCOUNT_KEY_B64,
+        )
+        .set_dns_suffix(BLOB_SERVICE)
+        .set_path(format!("/{CONTAINER}/{BLOB_NAME}"))
+        .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
+        .build()
+        .exec_blocking();
+
+
+    println!("The GET-response: {res:?}");
+
+    let status = res
+        .as_ref()
+        .expect("Get blob failed with result {res:?}")
+        .status();
+    assert!(
+        status == reqwest::StatusCode::OK,
+        "Expected status 200 OK, but observed http-status: {status}"
+    );
+
+    let data = res
+        .expect("Expected response-success")
+        .bytes()
+        .expect("Data as bytes in reponse");
+    let s = String::from_utf8_lossy(&data);
+
+    println!("Retrieved data: {s}");
+}
+
+
 fn test_delete_block_blob() {
     println!(
         "\nDelete blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{TEST_STORE_ACCOUNT}'."
@@ -265,6 +304,8 @@ fn run_tests_in_sequence() {
     test_create_block_blob();
 
     test_get_block_blob();
+
+    test_exec_get_block_blob();
 
     test_delete_block_blob();
 
