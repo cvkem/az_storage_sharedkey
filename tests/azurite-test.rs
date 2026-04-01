@@ -1,6 +1,7 @@
 use az_storage_sharedkey::{
     auth_header::{self, AuthHeader},
     body::Body,
+    method::Method,
 };
 use reqwest::{blocking};
 
@@ -31,7 +32,7 @@ fn test_create_container() {
     let query_pars = [("restype", "container")];
     // first build auth-header witout autorization to be able to extract the
     let mut sr = AuthHeader::new()
-        .set_method(auth_header::PUT)
+        .set_method(Method::Put)
         .set_store_account(
             TEST_STORE_ACCOUNT,
             TEST_STORE_ACCOUNT_KEY_B64,
@@ -84,7 +85,7 @@ fn test_create_block_blob() {
     let t_a = TEST_STORE_ACCOUNT.to_owned();
     // first build auth-header witout autorization to be able to extract the
     let mut sr = AuthHeader::new()
-        .set_method(auth_header::PUT)
+        .set_method(Method::Put)
         .set_store_account(
             &t_a,
             TEST_STORE_ACCOUNT_KEY_B64,
@@ -129,7 +130,7 @@ fn test_get_block_blob() {
     let path = format!("/{CONTAINER}/{BLOB_NAME}");
 
     let mut sr = AuthHeader::new()
-        .set_method(auth_header::GET)
+        .set_method(Method::Get)
         .set_store_account(
             TEST_STORE_ACCOUNT,
             TEST_STORE_ACCOUNT_KEY_B64,
@@ -179,7 +180,7 @@ fn test_delete_block_blob() {
     
 
     let mut sr = AuthHeader::new()
-        .set_method(auth_header::DELETE)
+        .set_method(Method::Delete)
         .set_store_account(
             TEST_STORE_ACCOUNT,
             TEST_STORE_ACCOUNT_KEY_B64,
@@ -221,7 +222,7 @@ fn test_delete_container() {
     let query_pars = [("restype", "container")];
     // first build auth-header witout autorization to be able to extract the
     let mut sr = AuthHeader::new()
-        .set_method(auth_header::DELETE)
+        .set_method(Method::Delete)
         .set_store_account(
             TEST_STORE_ACCOUNT,
             TEST_STORE_ACCOUNT_KEY_B64,

@@ -5,7 +5,7 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue, IntoHeaderName};
 use chrono::{DateTime, TimeZone, Utc};
 use crate::storage_request::StorageRequest;
 use crate::body::Body;
-use super::GET;
+use crate::method::Method;
 
 
 const PROTOCOL: &str = "http";
@@ -13,7 +13,7 @@ const PROTOCOL: &str = "http";
 
 #[derive(Clone)]
 pub struct AuthHeader<'a,'b,'c> {
-    method: &'static str,
+    method: Method,
     store_account: Option<&'a str>,
     store_account_key: &'a str,
     dns_suffix: Option<&'b str>,
@@ -34,7 +34,7 @@ impl<'a,'b,'c> Default for AuthHeader<'a,'b,'c> {
 impl<'a,'b,'c> AuthHeader<'a,'b,'c> {
     pub fn new() -> Self {
         AuthHeader {
-            method: GET,
+            method: Method::Get,
             store_account: None,
             store_account_key: "",
             dns_suffix: None,
@@ -149,7 +149,7 @@ impl<'a,'b,'c> AuthHeader<'a,'b,'c> {
         shared_auth
     }
 
-    pub fn set_method(mut self, method: &'static str) -> Self {
+    pub fn set_method(mut self, method: Method) -> Self {
         self.method = method;
         self
     }

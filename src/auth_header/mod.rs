@@ -1,10 +1,10 @@
 mod auth_header;
 mod hmac_sha256;
 
-pub const GET: &str = "GET";
-pub const PUT: &str = "PUT";
-pub const POST: &str = "POST";
-pub const DELETE: &str = "DELETE";
+// pub const GET: &str = "GET";
+// pub const PUT: &str = "PUT";
+// pub const POST: &str = "POST";
+// pub const DELETE: &str = "DELETE";
 
 
 
@@ -19,10 +19,12 @@ mod test {
     use crate::{
         auth_header::{self, AuthHeader},
         body::Body,
+        method::Method,
     };
 
     use chrono::{TimeZone, Utc};
     use reqwest::header::HeaderName;
+
 
     const TEST_STORE_ACCOUNT: &str = "devstoreaccount1";
     const TEST_STORE_ACCOUNT_KEY_B64: &str =
@@ -122,7 +124,7 @@ mod test {
         println!("The date = {dt:?}");
 
         let storage_request = AuthHeader::new()
-            .set_method(auth_header::GET)
+            .set_method(Method::Get)
             .set_store_account(
                 "myaccount",
                 TEST_STORE_ACCOUNT_KEY_B64,
@@ -163,7 +165,7 @@ mod test {
         println!("The date = {dt:?}");
 
         let auth_header = AuthHeader::new()
-            .set_method(auth_header::GET)
+            .set_method(Method::Get)
             .set_store_account(
                 "myaccount",
                 TEST_STORE_ACCOUNT_KEY_B64,
@@ -212,7 +214,7 @@ mod test {
         let query_pars = [("restype", "container")];
         // first build auth-header witout autorization to be able to extract the
         let sr = AuthHeader::new()
-            .set_method(auth_header::PUT)
+            .set_method(Method::Put)
             .set_store_account(
                 TEST_STORE_ACCOUNT,
                 TEST_STORE_ACCOUNT_KEY_B64,
@@ -244,7 +246,7 @@ mod test {
         let t_a = TEST_STORE_ACCOUNT.to_owned();
         // first build auth-header witout autorization to be able to extract the
         let sr = AuthHeader::new()
-            .set_method(auth_header::PUT)
+            .set_method(Method::Put)
             .set_store_account(
                 &t_a,
                 TEST_STORE_ACCOUNT_KEY_B64,
@@ -276,7 +278,7 @@ mod test {
 
         let sr = AuthHeader::new()
             .set_dns_suffix(BLOB_SERVICE)
-            .set_method(auth_header::GET)
+            .set_method(Method::Get)
             .set_store_account(
                 TEST_STORE_ACCOUNT,
                 TEST_STORE_ACCOUNT_KEY_B64,
