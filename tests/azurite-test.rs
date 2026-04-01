@@ -93,9 +93,7 @@ fn test_create_block_blob() {
         .set_path(path.to_owned())
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .insert_header("x-ms-blob-type", "BlockBlob".parse().unwrap())
-        //.insert_header("x-ms-blob-content-length", "512".parse().unwrap()); // required for pageblobs. Should be multiple of 512
-            .set_body(Body::Bytes(body_content))
-        .set_query_params(&[])
+        .set_body(Body::Bytes(body_content))
         .build();
 
 
@@ -139,7 +137,6 @@ fn test_get_block_blob() {
         .set_dns_suffix(BLOB_SERVICE)
         .set_path(path.to_owned())
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
-        .set_query_params(&[])
         .build();
 
 
@@ -161,7 +158,7 @@ fn test_get_block_blob() {
         .status();
     assert!(
         status == reqwest::StatusCode::OK,
-        "Expected status 201 CREATED, but observed http-status: {status}"
+        "Expected status 200 OK, but observed http-status: {status}"
     );
 
     let data = res
@@ -173,6 +170,92 @@ fn test_get_block_blob() {
     println!("Retrieved data: {s}");
 }
 
+fn test_delete_block_blob() {
+    println!(
+        "\nDelete blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{TEST_STORE_ACCOUNT}'."
+    );
+    let client = blocking::Client::new();
+    let path = format!("/{CONTAINER}/{BLOB_NAME}");
+    
+
+    let mut sr = AuthHeader::new()
+        .set_method(auth_header::DELETE)
+        .set_store_account(
+            TEST_STORE_ACCOUNT,
+            TEST_STORE_ACCOUNT_KEY_B64,
+        )
+        .set_dns_suffix(BLOB_SERVICE)
+        .set_path(path.to_owned())
+        .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
+        .build();
+
+
+    let headers = sr.extract_headermap();
+
+    let delete_container_url = sr.get_url();
+
+    println!("URL: {}", delete_container_url);
+
+    let res = client.delete(delete_container_url).headers(headers).send();
+
+    println!("The DELETE-response: {res:?}");
+
+    let status = res
+        .as_ref()
+        .expect("Get blob failed with result {res:?}")
+        .status();
+    assert!(
+        status == reqwest::StatusCode::ACCEPTED,
+        "Expected status 202 ACCEPTED, but observed http-status: {status}"
+    );
+
+}
+
+
+fn test_delete_container() {
+    println!("\nDelete container {CONTAINER} in store-account {TEST_STORE_ACCOUNT}");
+    let client = blocking::Client::new();
+
+    let path = format!("/{CONTAINER}");
+
+    let query_pars = [("restype", "container")];
+    // first build auth-header witout autorization to be able to extract the
+    let mut sr = AuthHeader::new()
+        .set_method(auth_header::DELETE)
+        .set_store_account(
+            TEST_STORE_ACCOUNT,
+            TEST_STORE_ACCOUNT_KEY_B64,
+        )
+        .set_dns_suffix(BLOB_SERVICE)
+        .set_path(path.to_owned())
+        .set_query_params(&query_pars)
+        .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
+        .build();
+
+
+    let headers = sr.extract_headermap();
+    let query_pars = sr.get_query_params();
+
+    let delete_container_url = sr.get_url();
+
+    println!("URL: {}", delete_container_url);
+    let res = client
+        .delete(delete_container_url)
+        .headers(headers)
+        .query(&query_pars)
+        .send();
+
+    println!("The DELETE-response: {res:?}");
+    let status = res
+        .expect("Create container failed with result {res:?}")
+        .status();
+    assert!(
+        status == reqwest::StatusCode::ACCEPTED,
+        "Expected status 202 ACCEPTED, but observed http-status: {status}"
+    );
+}
+
+
 
 #[test]
 fn run_tests_in_sequence() {
@@ -181,4 +264,8 @@ fn run_tests_in_sequence() {
     test_create_block_blob();
 
     test_get_block_blob();
+
+    test_delete_block_blob();
+
+    test_delete_container();
 }
