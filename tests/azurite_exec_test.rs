@@ -3,9 +3,7 @@ use az_storage_sharedkey::{
     body::Body,
     method::Method,
 };
-use reqwest::{blocking};
-
-
+use reqwest::blocking;
 
 // default account and key based on:
 //  https://docs.azure.cn/en-us/storage/common/storage-connect-azurite?tabs=blob-storage
@@ -29,10 +27,7 @@ fn test_exec_create_container() {
     let query_pars = [("restype", "container")];
     let res = AuthHeader::new()
         .set_method(Method::Put)
-        .set_store_account(
-            TEST_STORE_ACCOUNT,
-            TEST_STORE_ACCOUNT_KEY_B64,
-        )
+        .set_store_account(TEST_STORE_ACCOUNT, TEST_STORE_ACCOUNT_KEY_B64)
         .set_dns_suffix(BLOB_SERVICE)
         .set_path(&format!("/{CONTAINER}"))
         .set_query_params(&query_pars)
@@ -62,10 +57,7 @@ fn test_exec_create_block_blob() {
     // first build auth-header witout autorization to be able to extract the
     let res = AuthHeader::new()
         .set_method(Method::Put)
-        .set_store_account(
-            &t_a,
-            TEST_STORE_ACCOUNT_KEY_B64,
-        )
+        .set_store_account(&t_a, TEST_STORE_ACCOUNT_KEY_B64)
         .set_dns_suffix(BLOB_SERVICE)
         .set_path(&format!("/{CONTAINER}/{BLOB_NAME}"))
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
@@ -83,24 +75,18 @@ fn test_exec_create_block_blob() {
     );
 }
 
-
-
 fn test_exec_get_block_blob() {
     println!(
         "\nGet blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{TEST_STORE_ACCOUNT}'."
     );
     let res = AuthHeader::new()
         .set_method(Method::Get)
-        .set_store_account(
-            TEST_STORE_ACCOUNT,
-            TEST_STORE_ACCOUNT_KEY_B64,
-        )
+        .set_store_account(TEST_STORE_ACCOUNT, TEST_STORE_ACCOUNT_KEY_B64)
         .set_dns_suffix(BLOB_SERVICE)
         .set_path(&format!("/{CONTAINER}/{BLOB_NAME}"))
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .build()
         .exec_blocking();
-
 
     println!("The GET-response: {res:?}");
 
@@ -122,7 +108,6 @@ fn test_exec_get_block_blob() {
     println!("Retrieved data: {s}");
 }
 
-
 fn test_exec_delete_block_blob() {
     println!(
         "\nDelete blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{TEST_STORE_ACCOUNT}'."
@@ -130,10 +115,7 @@ fn test_exec_delete_block_blob() {
 
     let res = AuthHeader::new()
         .set_method(Method::Delete)
-        .set_store_account(
-            TEST_STORE_ACCOUNT,
-            TEST_STORE_ACCOUNT_KEY_B64,
-        )
+        .set_store_account(TEST_STORE_ACCOUNT, TEST_STORE_ACCOUNT_KEY_B64)
         .set_dns_suffix(BLOB_SERVICE)
         .set_path(&format!("/{CONTAINER}/{BLOB_NAME}"))
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
@@ -150,9 +132,7 @@ fn test_exec_delete_block_blob() {
         status == reqwest::StatusCode::ACCEPTED,
         "Expected status 202 ACCEPTED, but observed http-status: {status}"
     );
-
 }
-
 
 fn test_exec_delete_container() {
     println!("\nDelete container {CONTAINER} in store-account {TEST_STORE_ACCOUNT}");
@@ -161,10 +141,7 @@ fn test_exec_delete_container() {
     // first build auth-header witout autorization to be able to extract the
     let res = AuthHeader::new()
         .set_method(Method::Delete)
-        .set_store_account(
-            TEST_STORE_ACCOUNT,
-            TEST_STORE_ACCOUNT_KEY_B64,
-        )
+        .set_store_account(TEST_STORE_ACCOUNT, TEST_STORE_ACCOUNT_KEY_B64)
         .set_dns_suffix(BLOB_SERVICE)
         .set_path(&format!("/{CONTAINER}"))
         .set_query_params(&query_pars)
@@ -181,7 +158,6 @@ fn test_exec_delete_container() {
         "Expected status 202 ACCEPTED, but observed http-status: {status}"
     );
 }
-
 
 #[test]
 fn run_exec_tests_in_sequence() {

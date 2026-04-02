@@ -1,18 +1,16 @@
 use crate::date::utc_date_str;
 
 use super::hmac_sha256;
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue, IntoHeaderName};
-use chrono::{DateTime, TimeZone, Utc};
-use crate::storage_request::StorageRequest;
 use crate::body::Body;
 use crate::method::Method;
-
+use crate::storage_request::StorageRequest;
+use chrono::{DateTime, TimeZone, Utc};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue, IntoHeaderName};
 
 const PROTOCOL: &str = "http";
 
-
 #[derive(Clone)]
-pub struct AuthHeader<'a,'b,'c, 'd> {
+pub struct AuthHeader<'a, 'b, 'c, 'd> {
     method: Method,
     store_account: Option<&'a str>,
     store_account_key: &'a str,
@@ -22,16 +20,16 @@ pub struct AuthHeader<'a,'b,'c, 'd> {
     headermap: Option<HeaderMap>,
     query_params: Option<Vec<(String, String)>>,
     content_length: usize,
-    body: Option<Body<'c>>
+    body: Option<Body<'c>>,
 }
 
-impl<'a,'b,'c,'d> Default for AuthHeader<'a,'b,'c,'d> {
+impl<'a, 'b, 'c, 'd> Default for AuthHeader<'a, 'b, 'c, 'd> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a,'b,'c,'d> AuthHeader<'a,'b,'c,'d> {
+impl<'a, 'b, 'c, 'd> AuthHeader<'a, 'b, 'c, 'd> {
     pub fn new() -> Self {
         AuthHeader {
             method: Method::Get,
@@ -43,23 +41,32 @@ impl<'a,'b,'c,'d> AuthHeader<'a,'b,'c,'d> {
             headermap: None,
             query_params: None,
             content_length: 0,
-            body: None
+            body: None,
         }
     }
 
     /// set the datetime of the request. The DateTime<T> is translated to UTC time, as this is needed for the header.
-    pub fn set_datetime<T>(mut self, dt: DateTime<T>) -> Self 
-        where T: TimeZone {
+    pub fn set_datetime<T>(mut self, dt: DateTime<T>) -> Self
+    where
+        T: TimeZone,
+    {
         self.datetime = Some(dt.to_utc());
         self
     }
 
     /// Headers might contain multiple values however, for as this function can only return one header-value it panics when multiple headervalues are present.
     fn get_header_value(&self, key: &HeaderName) -> &str {
-        let mut values = self.headermap.as_ref().expect("headmap should have at least one key").get_all(key).iter();
+        let mut values = self
+            .headermap
+            .as_ref()
+            .expect("headmap should have at least one key")
+            .get_all(key)
+            .iter();
         match (values.next(), values.next()) {
             (None, None) => "",
-            (Some(value), None) => value.to_str().expect("value of key '{key}' should be string. Received {value:?}"),
+            (Some(value), None) => value
+                .to_str()
+                .expect("value of key '{key}' should be string. Received {value:?}"),
             _ => {
                 assert!(false, "Key '{key}' has more than one value");
                 ""
@@ -69,7 +76,7 @@ impl<'a,'b,'c,'d> AuthHeader<'a,'b,'c,'d> {
 
     /// get the string that needs to be signed to get the authorization-header.
     /// However, beware that header 'x-ms-date' still might be missing as that is added last-minute)
-    /// used for internal purposes only (so not public). 
+    /// used for internal purposes only (so not public).
     fn get_string_to_sign(&self) -> String {
         // draw an array of 'x-ms-...'  headers and sort them on the key.
         let mut ms_headers: Vec<_> = self
@@ -90,35 +97,38 @@ impl<'a,'b,'c,'d> AuthHeader<'a,'b,'c,'d> {
             .join("");
 
         // source of specifications: https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#blob-queue-and-file-services-shared-key-authorization
-        // GET\n /*HTTP Verb*/  
-        // \n    /*Content-Encoding*/  
-        // \n    /*Content-Language*/  
-        // \n    /*Content-Length (empty string when zero)*/  
-        // \n    /*Content-MD5*/  
-        // \n    /*Content-Type*/  
-        // \n    /*Date*/  
-        // \n    /*If-Modified-Since */  
-        // \n    /*If-Match*/  
-        // \n    /*If-None-Match*/  
-        // \n    /*If-Unmodified-Since*/  
-        // \n    /*Range*/  
-        // x-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n    /*CanonicalizedHeaders*/  
-        // /myaccount /mycontainer\ncomp:metadata\nrestype:container\ntimeout:20    /*CanonicalizedResource*/ 
-
-            let mut to_sign = format!(
+        // GET\n /*HTTP Verb*/
+        // \n    /*Content-Encoding*/
+        // \n    /*Content-Language*/
+        // \n    /*Content-Length (empty string when zero)*/
+        // \n    /*Content-MD5*/
+        // \n    /*Content-Type*/
+        // \n    /*Date*/
+        // \n    /*If-Modified-Since */
+        // \n    /*If-Match*/
+        // \n    /*If-None-Match*/
+        // \n    /*If-Unmodified-Since*/
+        // \n    /*Range*/
+        // x-ms-date:Fri, 26 Jun 2015 23:39:12 GMT\nx-ms-version:2015-02-21\n    /*CanonicalizedHeaders*/
+        // /myaccount /mycontainer\ncomp:metadata\nrestype:container\ntimeout:20    /*CanonicalizedResource*/
+        let mut to_sign = format!(
             "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}/{}{}",
             self.method,
             self.get_header_value(&reqwest::header::CONTENT_ENCODING),
-            self.get_header_value(&reqwest::header::CONTENT_LANGUAGE),            
-            if self.content_length > 0 { self.content_length.to_string()} else { "".to_owned() },
-            self.get_header_value(&HeaderName::from_static("content_md5")),            
+            self.get_header_value(&reqwest::header::CONTENT_LANGUAGE),
+            if self.content_length > 0 {
+                self.content_length.to_string()
+            } else {
+                "".to_owned()
+            },
+            self.get_header_value(&HeaderName::from_static("content_md5")),
             self.get_header_value(&reqwest::header::CONTENT_TYPE),
-            self.get_header_value(&reqwest::header::DATE),  
-            self.get_header_value(&reqwest::header::IF_MODIFIED_SINCE), 
-            self.get_header_value(&reqwest::header::IF_MATCH),     
-            self.get_header_value(&reqwest::header::IF_NONE_MATCH),     
-            self.get_header_value(&reqwest::header::IF_UNMODIFIED_SINCE), 
-            self.get_header_value(&reqwest::header::RANGE), 
+            self.get_header_value(&reqwest::header::DATE),
+            self.get_header_value(&reqwest::header::IF_MODIFIED_SINCE),
+            self.get_header_value(&reqwest::header::IF_MATCH),
+            self.get_header_value(&reqwest::header::IF_NONE_MATCH),
+            self.get_header_value(&reqwest::header::IF_UNMODIFIED_SINCE),
+            self.get_header_value(&reqwest::header::RANGE),
             ms_header_str,
             self.store_account
                 .as_ref()
@@ -126,11 +136,9 @@ impl<'a,'b,'c,'d> AuthHeader<'a,'b,'c,'d> {
             self.get_path()
         );
         // add resources to the to_sign string
-        self.get_query_params()
-            .iter()
-            .for_each(|p| {
-                to_sign.push('\n');
-                to_sign.push_str(&format!("{}:{}", p.0, p.1));
+        self.get_query_params().iter().for_each(|p| {
+            to_sign.push('\n');
+            to_sign.push_str(&format!("{}:{}", p.0, p.1));
         });
 
         to_sign
@@ -171,19 +179,25 @@ impl<'a,'b,'c,'d> AuthHeader<'a,'b,'c,'d> {
     }
 
     pub fn get_path(&self) -> &str {
-//        self.path.as_ref().map(|v| v.as_str()).unwrap_or("/")
+        //        self.path.as_ref().map(|v| v.as_str()).unwrap_or("/")
         self.path.unwrap_or("/")
     }
 
     /// When adding a body via 'set_body()' the content length is automatically added. So only use this function if you do want to set content_lemgth without setting a body.
     pub fn set_content_length_without_body(mut self, len: usize) -> Self {
-        assert!(self.content_length == 0, "Can not set content-lenght twice. set_body already sets the content length.");
+        assert!(
+            self.content_length == 0,
+            "Can not set content-lenght twice. set_body already sets the content length."
+        );
         self.content_length = len;
         self
     }
 
-    pub fn set_body(mut self, body: Body<'c>) -> Self{
-        assert!(self.body.is_none(), "Body has already been set. can not set body twice");
+    pub fn set_body(mut self, body: Body<'c>) -> Self {
+        assert!(
+            self.body.is_none(),
+            "Body has already been set. can not set body twice"
+        );
         // set content length to the byte-length of the body, even if it is a string.
         self.body = Some(body);
         self.set_content_length_without_body(body.byte_len())
@@ -202,65 +216,84 @@ impl<'a,'b,'c,'d> AuthHeader<'a,'b,'c,'d> {
         self
     }
 
-    pub fn get_query_params(&self) -> &[(String,String)]{
+    pub fn get_query_params(&self) -> &[(String, String)] {
         self.query_params
             .as_ref()
             .map(|v| v.as_slice())
             .unwrap_or(&[])
     }
 
-
     /// Insert the (key, value) as a header in the headermap, creating an empty headermap if none exists yet.
-    pub fn insert_header<K>(mut self, key: K, value: HeaderValue) -> Self 
-        where K: IntoHeaderName + ToString {
+    pub fn insert_header<K>(mut self, key: K, value: HeaderValue) -> Self
+    where
+        K: IntoHeaderName + ToString,
+    {
         // using to_string as
         {
             let key_str = key.to_string();
-            assert!(key_str != super::MSDATE_KEY, "Use the method 'self.set_date(...)' to add a date-headers.");
-            assert!(key_str != reqwest::header::CONTENT_LENGTH.as_str(), "Use the method 'self.set_body(...) which does calculate and add a content-length to the headers." );
-            assert!(key_str != reqwest::header::AUTHORIZATION.as_str(), "This library will compute the shared-key based on url and query-parameters, so this header is auto-generated");
+            assert!(
+                key_str != super::MSDATE_KEY,
+                "Use the method 'self.set_date(...)' to add a date-headers."
+            );
+            assert!(
+                key_str != reqwest::header::CONTENT_LENGTH.as_str(),
+                "Use the method 'self.set_body(...) which does calculate and add a content-length to the headers."
+            );
+            assert!(
+                key_str != reqwest::header::AUTHORIZATION.as_str(),
+                "This library will compute the shared-key based on url and query-parameters, so this header is auto-generated"
+            );
         }
-//        self.headermap = self.headermap.or(Some(HeaderMap::new()));
+        //        self.headermap = self.headermap.or(Some(HeaderMap::new()));
 
-        self
-            .headermap
+        self.headermap
             .get_or_insert(HeaderMap::new())
             .append(key, value);
 
         self
     }
 
-
     /// Build a 'StorageRequest' object based on the current input in the 'AuthHeader'.
     /// During the build phase the headermap is extended with a x-ms-date and an 'Authorization' header.
     pub fn build(mut self) -> StorageRequest<'c> {
-        let url = format!("{PROTOCOL}://{}.{}{}", 
-            self.store_account.as_ref().expect("Set storage-account via 'set_storage_account' before building the request"),
-            self.dns_suffix.as_ref().expect("Set the dns-suffix via 'set_dns_suffix' before building the request"),
-            self.get_path()); // emtpy path translates to '/'.  //  expect("Set path-parameters via 'set_path' before building the request."));
+        let url = format!(
+            "{PROTOCOL}://{}.{}{}",
+            self.store_account.as_ref().expect(
+                "Set storage-account via 'set_storage_account' before building the request"
+            ),
+            self.dns_suffix
+                .as_ref()
+                .expect("Set the dns-suffix via 'set_dns_suffix' before building the request"),
+            self.get_path()
+        ); // emtpy path translates to '/'.  //  expect("Set path-parameters via 'set_path' before building the request."));
 
         // add missing headers needed to compute the shared-key
         {
-            let hm = self
-                .headermap
-                .get_or_insert(HeaderMap::new());
+            let hm = self.headermap.get_or_insert(HeaderMap::new());
 
             let datetime_str = utc_date_str(&self.datetime.unwrap_or(Utc::now()));
-            hm.insert(super::MSDATE_KEY, HeaderValue::from_str(&datetime_str).unwrap());
+            hm.insert(
+                super::MSDATE_KEY,
+                HeaderValue::from_str(&datetime_str).unwrap(),
+            );
 
             if self.content_length > 0 {
-                 hm.insert(reqwest::header::CONTENT_LENGTH , self.content_length.to_string().parse().unwrap());
-            } 
+                hm.insert(
+                    reqwest::header::CONTENT_LENGTH,
+                    self.content_length.to_string().parse().unwrap(),
+                );
+            }
             // add content length !!
         }
         let to_sign = self.get_string_to_sign();
         let auth_val = self.get_shared_authorization(&to_sign);
 
-        let mut hm = self.headermap.expect("No headermap present. Insert value with 'insert_header'.");
+        let mut hm = self
+            .headermap
+            .expect("No headermap present. Insert value with 'insert_header'.");
 
-        hm.insert(reqwest::header::AUTHORIZATION , auth_val.parse().unwrap());
+        hm.insert(reqwest::header::AUTHORIZATION, auth_val.parse().unwrap());
 
         StorageRequest::new(self.method, url, self.query_params, to_sign, hm, self.body)
     }
-
 }

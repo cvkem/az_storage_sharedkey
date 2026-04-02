@@ -1,26 +1,38 @@
-use reqwest::{blocking::{self, Response}, 
-    Error, header::HeaderMap};
 use crate::body::Body;
 use crate::method::Method;
-use std::ops::Deref;
-
-
+use reqwest::{
+    Error,
+    blocking::{self, Response},
+    header::HeaderMap,
+};
 
 pub struct StorageRequest<'c> {
     method: Method,
     url: String,
     query_params: Option<Vec<(String, String)>>,
     unsigned_authorization: String,
-    headermap: Option<HeaderMap>, 
-    body: Option<Body<'c>>
+    headermap: Option<HeaderMap>,
+    body: Option<Body<'c>>,
 }
 
-
 impl<'c> StorageRequest<'c> {
-
-    pub fn new(method: Method, url: String, query_params: Option<Vec<(String, String)>>, unsigned_authorization: String, headermap: HeaderMap, body: Option<Body<'c>>) -> Self {
+    pub fn new(
+        method: Method,
+        url: String,
+        query_params: Option<Vec<(String, String)>>,
+        unsigned_authorization: String,
+        headermap: HeaderMap,
+        body: Option<Body<'c>>,
+    ) -> Self {
         let headermap = Some(headermap);
-        StorageRequest{method, url, query_params, unsigned_authorization, headermap, body}
+        StorageRequest {
+            method,
+            url,
+            query_params,
+            unsigned_authorization,
+            headermap,
+            body,
+        }
     }
 
     pub fn get_url(&self) -> &str {
@@ -31,11 +43,15 @@ impl<'c> StorageRequest<'c> {
     }
 
     pub fn get_headermap(&self) -> &HeaderMap {
-        self.headermap.as_ref().expect("Headermap already has been extracted")
+        self.headermap
+            .as_ref()
+            .expect("Headermap already has been extracted")
     }
 
     pub fn extract_headermap(&mut self) -> HeaderMap {
-        self.headermap.take().expect("Headermap can be extracted only once")
+        self.headermap
+            .take()
+            .expect("Headermap can be extracted only once")
     }
 
     pub fn get_query_params(&self) -> &Option<Vec<(String, String)>> {
@@ -44,10 +60,10 @@ impl<'c> StorageRequest<'c> {
 
     /// this function will consume the 'body' as the body needs to be passed through, and that could extend minimal lifetime of the 'StorageRequest'.
     pub fn body_as_bytes(&self) -> Option<&'c [u8]> {
-        // use and_then 
+        // use and_then
         match self.body {
             Some(b) => Some(b.as_bytes()),
-            None => None
+            None => None,
         }
     }
 
@@ -55,7 +71,7 @@ impl<'c> StorageRequest<'c> {
         let client = blocking::Client::new();
 
         let client = match self.method {
-            Method::Get => client.get(self.get_url()), 
+            Method::Get => client.get(self.get_url()),
             Method::Head => client.head(self.get_url()),
             Method::Post => client.post(self.get_url()),
             Method::Put => client.put(self.get_url()),
@@ -63,8 +79,7 @@ impl<'c> StorageRequest<'c> {
             // Method::Connect => client.connect(self.get_url()),
             // Method::Options => client.options(self.get_url()),
             // Method::Trace => client.trace(self.get_url()),
-            _ => panic!("method '{}' not available in reqwest", self.method)
-
+            _ => panic!("method '{}' not available in reqwest", self.method),
         };
 
         let client = client.headers(self.extract_headermap());
@@ -86,5 +101,4 @@ impl<'c> StorageRequest<'c> {
 
         res
     }
-
 }

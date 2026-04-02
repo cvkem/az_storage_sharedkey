@@ -1,19 +1,18 @@
 /// The Body enum needs to be Copy otherwise it is difficult to unpack an Option<Body>
 /// The body maintains a reference that later will be translated to a reqwest::Body or a reqwest::blocking::Body, which are two different structs.
 /// Keeping it generic here, or producing a bytes::Bytes here allows this code to be generic whether for blocking or asynchronous requests.
-#[derive(Clone,Copy)]
+#[derive(Clone, Copy)]
 pub enum Body<'a> {
-    Bytes(&'a[u8]),
-    Text(&'a str)
+    Bytes(&'a [u8]),
+    Text(&'a str),
 }
 
 impl<'a> Body<'a> {
-
     /// find the length of the body when translated to bytes.
     pub fn byte_len(&self) -> usize {
         match *self {
             Self::Bytes(b) => b.len(),
-            Self::Text(s) => s.as_bytes().len()
+            Self::Text(s) => s.len(), // this is same as s.as_bytes().len() as s.len() is already as utf8 bytes
         }
     }
 
@@ -22,7 +21,22 @@ impl<'a> Body<'a> {
     pub fn as_bytes(&self) -> &'a [u8] {
         match *self {
             Self::Bytes(b) => b,
-            Self::Text(s) => s.as_bytes()
+            Self::Text(s) => s.as_bytes(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    #[test]
+    fn test_string_length() {
+        let s = "\u{1F601}\u{1F602}\u{1F603}";
+        println!("{s}");
+        assert!(s.len() == s.as_bytes().len());
+        assert!(s.len() == 12); // so the length of a string is its length as utf-8 bytes
+        let s = "smiley: \u{1F602}\u{1F603}";
+        assert!(s.len() == s.as_bytes().len());
+        assert!(s.len() == 16); // so the length of a string is its length as utf-8 bytes
     }
 }

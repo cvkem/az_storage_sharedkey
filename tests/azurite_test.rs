@@ -3,9 +3,7 @@ use az_storage_sharedkey::{
     body::Body,
     method::Method,
 };
-use reqwest::{blocking};
-
-
+use reqwest::blocking;
 
 // default account and key based on:
 //  https://docs.azure.cn/en-us/storage/common/storage-connect-azurite?tabs=blob-storage
@@ -33,26 +31,26 @@ fn test_create_container() {
     // first build auth-header without autorization to be able to extract the
     let mut sr = AuthHeader::new()
         .set_method(Method::Put)
-        .set_store_account(
-            TEST_STORE_ACCOUNT,
-            TEST_STORE_ACCOUNT_KEY_B64,
-        )
+        .set_store_account(TEST_STORE_ACCOUNT, TEST_STORE_ACCOUNT_KEY_B64)
         .set_dns_suffix(BLOB_SERVICE)
         .set_path(&path)
         .set_query_params(&query_pars)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
-//        .insert_header("x-ms-version", "2026-02-06".parse().unwrap())   // this version is not yet supported by Azurite (2026-03-29)
-//                                                                           see: https://learn.microsoft.com/en-us/rest/api/storageservices/versioning-for-the-azure-storage-services
+        //        .insert_header("x-ms-version", "2026-02-06".parse().unwrap())   // this version is not yet supported by Azurite (2026-03-29)
+        //                                                                           see: https://learn.microsoft.com/en-us/rest/api/storageservices/versioning-for-the-azure-storage-services
         .build();
-
 
     let headers = sr.extract_headermap();
     let query_pars = sr.get_query_params();
 
-    let create_container_url_org = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
+    let create_container_url_org =
+        format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
     let create_container_url = sr.get_url();
 
-    assert!(create_container_url == create_container_url_org, "mismatch in urls");
+    assert!(
+        create_container_url == create_container_url_org,
+        "mismatch in urls"
+    );
 
     println!("URL: {}", create_container_url);
     let res = client
@@ -86,10 +84,7 @@ fn test_create_block_blob() {
     // first build auth-header witout autorization to be able to extract the
     let mut sr = AuthHeader::new()
         .set_method(Method::Put)
-        .set_store_account(
-            &t_a,
-            TEST_STORE_ACCOUNT_KEY_B64,
-        )
+        .set_store_account(&t_a, TEST_STORE_ACCOUNT_KEY_B64)
         .set_dns_suffix(BLOB_SERVICE)
         .set_path(&path)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
@@ -97,14 +92,17 @@ fn test_create_block_blob() {
         .set_body(Body::Bytes(body_content))
         .build();
 
-
     let headers = sr.extract_headermap();
 
-    let create_container_url_org = format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
+    let create_container_url_org =
+        format!("{PROTOCOL}://{TEST_STORE_ACCOUNT}.{BLOB_SERVICE}{path}");
     let create_container_url = sr.get_url();
     println!("URL: {}", create_container_url);
 
-    assert!(create_container_url == create_container_url_org, "mismatch in urls");
+    assert!(
+        create_container_url == create_container_url_org,
+        "mismatch in urls"
+    );
 
     let res = client
         .put(create_container_url)
@@ -131,15 +129,11 @@ fn test_get_block_blob() {
 
     let mut sr = AuthHeader::new()
         .set_method(Method::Get)
-        .set_store_account(
-            TEST_STORE_ACCOUNT,
-            TEST_STORE_ACCOUNT_KEY_B64,
-        )
+        .set_store_account(TEST_STORE_ACCOUNT, TEST_STORE_ACCOUNT_KEY_B64)
         .set_dns_suffix(BLOB_SERVICE)
         .set_path(&path)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .build();
-
 
     let headers = sr.extract_headermap();
 
@@ -147,7 +141,10 @@ fn test_get_block_blob() {
     let get_container_url = sr.get_url();
 
     println!("URL: {}", get_container_url);
-    assert!(get_container_url_org == get_container_url, "Mismatch in urls for '{get_container_url}'");
+    assert!(
+        get_container_url_org == get_container_url,
+        "Mismatch in urls for '{get_container_url}'"
+    );
 
     let res = client.get(get_container_url).headers(headers).send();
 
@@ -171,27 +168,20 @@ fn test_get_block_blob() {
     println!("Retrieved data: {s}");
 }
 
-
-
 fn test_delete_block_blob() {
     println!(
         "\nDelete blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{TEST_STORE_ACCOUNT}'."
     );
     let client = blocking::Client::new();
     let path = format!("/{CONTAINER}/{BLOB_NAME}");
-    
 
     let mut sr = AuthHeader::new()
         .set_method(Method::Delete)
-        .set_store_account(
-            TEST_STORE_ACCOUNT,
-            TEST_STORE_ACCOUNT_KEY_B64,
-        )
+        .set_store_account(TEST_STORE_ACCOUNT, TEST_STORE_ACCOUNT_KEY_B64)
         .set_dns_suffix(BLOB_SERVICE)
         .set_path(&path)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .build();
-
 
     let headers = sr.extract_headermap();
 
@@ -211,9 +201,7 @@ fn test_delete_block_blob() {
         status == reqwest::StatusCode::ACCEPTED,
         "Expected status 202 ACCEPTED, but observed http-status: {status}"
     );
-
 }
-
 
 fn test_delete_container() {
     println!("\nDelete container {CONTAINER} in store-account {TEST_STORE_ACCOUNT}");
@@ -225,16 +213,12 @@ fn test_delete_container() {
     // first build auth-header witout autorization to be able to extract the
     let mut sr = AuthHeader::new()
         .set_method(Method::Delete)
-        .set_store_account(
-            TEST_STORE_ACCOUNT,
-            TEST_STORE_ACCOUNT_KEY_B64,
-        )
+        .set_store_account(TEST_STORE_ACCOUNT, TEST_STORE_ACCOUNT_KEY_B64)
         .set_dns_suffix(BLOB_SERVICE)
         .set_path(&path)
         .set_query_params(&query_pars)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .build();
-
 
     let headers = sr.extract_headermap();
     let query_pars = sr.get_query_params();
@@ -257,8 +241,6 @@ fn test_delete_container() {
         "Expected status 202 ACCEPTED, but observed http-status: {status}"
     );
 }
-
-
 
 #[test]
 fn run_tests_in_sequence() {
