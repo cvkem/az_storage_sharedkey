@@ -12,12 +12,12 @@ const PROTOCOL: &str = "http";
 
 
 #[derive(Clone)]
-pub struct AuthHeader<'a,'b,'c> {
+pub struct AuthHeader<'a,'b,'c, 'd> {
     method: Method,
     store_account: Option<&'a str>,
     store_account_key: &'a str,
     dns_suffix: Option<&'b str>,
-    path: Option<String>,
+    path: Option<&'d str>,
     datetime: Option<DateTime<Utc>>,
     headermap: Option<HeaderMap>,
     query_params: Option<Vec<(String, String)>>,
@@ -25,13 +25,13 @@ pub struct AuthHeader<'a,'b,'c> {
     body: Option<Body<'c>>
 }
 
-impl<'a,'b,'c> Default for AuthHeader<'a,'b,'c> {
+impl<'a,'b,'c,'d> Default for AuthHeader<'a,'b,'c,'d> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a,'b,'c> AuthHeader<'a,'b,'c> {
+impl<'a,'b,'c,'d> AuthHeader<'a,'b,'c,'d> {
     pub fn new() -> Self {
         AuthHeader {
             method: Method::Get,
@@ -69,7 +69,7 @@ impl<'a,'b,'c> AuthHeader<'a,'b,'c> {
 
     /// get the string that needs to be signed to get the authorization-header.
     /// However, beware that header 'x-ms-date' still might be missing as that is added last-minute)
-    /// used for internal purposes only. 
+    /// used for internal purposes only (so not public). 
     fn get_string_to_sign(&self) -> String {
         // draw an array of 'x-ms-...'  headers and sort them on the key.
         let mut ms_headers: Vec<_> = self
@@ -165,13 +165,14 @@ impl<'a,'b,'c> AuthHeader<'a,'b,'c> {
         self
     }
 
-    pub fn set_path(mut self, path: String) -> Self {
+    pub fn set_path(mut self, path: &'d str) -> Self {
         self.path = Some(path);
         self
     }
 
     pub fn get_path(&self) -> &str {
-        self.path.as_ref().map(|v| v.as_str()).unwrap_or("/")
+//        self.path.as_ref().map(|v| v.as_str()).unwrap_or("/")
+        self.path.unwrap_or("/")
     }
 
     /// When adding a body via 'set_body()' the content length is automatically added. So only use this function if you do want to set content_lemgth without setting a body.

@@ -130,7 +130,7 @@ mod test {
                 TEST_STORE_ACCOUNT_KEY_B64,
             )
             .set_dns_suffix(BLOB_SERVICE)
-            .set_path("/mycontainer".to_owned())
+            .set_path("/mycontainer")
             .set_datetime(dt)
             .insert_header("x-ms-version", "2015-02-21".parse().unwrap())
             .set_query_params(&[
@@ -171,7 +171,7 @@ mod test {
                 TEST_STORE_ACCOUNT_KEY_B64,
             )
             .set_dns_suffix(BLOB_SERVICE)
-            .set_path("/mycontainer".to_owned())
+            .set_path("/mycontainer")
             .set_datetime(dt)
             .set_content_length_without_body(123)
             .insert_header("x-ms-version", "2015-02-21".parse().unwrap())
@@ -220,7 +220,7 @@ mod test {
                 TEST_STORE_ACCOUNT_KEY_B64,
             )
             .set_dns_suffix(BLOB_SERVICE)
-            .set_path(path.to_owned())
+            .set_path(&path)
             .set_query_params(&query_pars)
             .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
             .build();
@@ -252,7 +252,7 @@ mod test {
                 TEST_STORE_ACCOUNT_KEY_B64,
             )
             .set_dns_suffix(BLOB_SERVICE)
-            .set_path(path.to_owned())
+            .set_path(&path)
             .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
             .insert_header("x-ms-blob-type", "BlockBlob".parse().unwrap())
             .set_body(Body::Text(body_content))
@@ -283,7 +283,7 @@ mod test {
                 TEST_STORE_ACCOUNT,
                 TEST_STORE_ACCOUNT_KEY_B64,
             )
-            .set_path(path.to_owned())
+            .set_path(&path)
             .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
             .set_query_params(&[])
             .build();

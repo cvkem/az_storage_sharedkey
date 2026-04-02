@@ -38,7 +38,7 @@ fn test_create_container() {
             TEST_STORE_ACCOUNT_KEY_B64,
         )
         .set_dns_suffix(BLOB_SERVICE)
-        .set_path(path.to_owned())
+        .set_path(&path)
         .set_query_params(&query_pars)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
 //        .insert_header("x-ms-version", "2026-02-06".parse().unwrap())   // this version is not yet supported by Azurite (2026-03-29)
@@ -91,7 +91,7 @@ fn test_create_block_blob() {
             TEST_STORE_ACCOUNT_KEY_B64,
         )
         .set_dns_suffix(BLOB_SERVICE)
-        .set_path(path.to_owned())
+        .set_path(&path)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .insert_header("x-ms-blob-type", "BlockBlob".parse().unwrap())
         .set_body(Body::Bytes(body_content))
@@ -136,7 +136,7 @@ fn test_get_block_blob() {
             TEST_STORE_ACCOUNT_KEY_B64,
         )
         .set_dns_suffix(BLOB_SERVICE)
-        .set_path(path.to_owned())
+        .set_path(&path)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .build();
 
@@ -183,7 +183,7 @@ fn test_exec_get_block_blob() {
             TEST_STORE_ACCOUNT_KEY_B64,
         )
         .set_dns_suffix(BLOB_SERVICE)
-        .set_path(format!("/{CONTAINER}/{BLOB_NAME}"))
+        .set_path(&format!("/{CONTAINER}/{BLOB_NAME}"))
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .build()
         .exec_blocking();
@@ -225,7 +225,7 @@ fn test_delete_block_blob() {
             TEST_STORE_ACCOUNT_KEY_B64,
         )
         .set_dns_suffix(BLOB_SERVICE)
-        .set_path(path.to_owned())
+        .set_path(&path)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .build();
 
@@ -267,7 +267,7 @@ fn test_delete_container() {
             TEST_STORE_ACCOUNT_KEY_B64,
         )
         .set_dns_suffix(BLOB_SERVICE)
-        .set_path(path.to_owned())
+        .set_path(&path)
         .set_query_params(&query_pars)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .build();

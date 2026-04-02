@@ -69,7 +69,8 @@ impl<'c> StorageRequest<'c> {
         };
 
         let client = if let Some(body) = self.body_as_bytes() {
-            let bc = body.to_owned(); // is this an efficient solution.
+            let bc = body.to_owned(); // This make a copy of the referenced data, such that it can be moved to the bytes::Bytes that is generated for the body.
+            // Basically this is a delayed copy/clone. It could be done earlier to make the code simples (less lifetimes needed) as it needs to happen now anyway.
             client.body(bc)
         } else {
             client
