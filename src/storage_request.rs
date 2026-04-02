@@ -55,8 +55,15 @@ impl<'c> StorageRequest<'c> {
         let client = blocking::Client::new();
 
         let client = match self.method {
-            Method::Get => client.get(self.get_url()),   // why is to-owned needed?
-            _ => panic!("method not recognized")
+            Method::Get => client.get(self.get_url()), 
+            Method::Head => client.head(self.get_url()),
+            Method::Post => client.post(self.get_url()),
+            Method::Put => client.put(self.get_url()),
+            Method::Delete => client.delete(self.get_url()),
+            // Method::Connect => client.connect(self.get_url()),
+            // Method::Options => client.options(self.get_url()),
+            // Method::Trace => client.trace(self.get_url()),
+            _ => panic!("method '{}' not available in reqwest", self.method)
 
         };
 
