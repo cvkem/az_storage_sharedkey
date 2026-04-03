@@ -1,16 +1,16 @@
 use crate::date::utc_date_str;
-
 use super::hmac_sha256;
 use crate::body::Body;
 use crate::method::Method;
 use crate::storage_request::StorageRequest;
+use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, IntoHeaderName};
 
 const PROTOCOL: &str = "http";
 
 #[derive(Clone)]
-pub struct AuthHeader<'a, 'b, 'c, 'd> {
+pub struct AuthHeader<'a, 'b, 'd> {
     method: Method,
     store_account: Option<&'a str>,
     store_account_key: &'a str,
@@ -20,16 +20,16 @@ pub struct AuthHeader<'a, 'b, 'c, 'd> {
     headermap: Option<HeaderMap>,
     query_params: Option<Vec<(String, String)>>,
     content_length: usize,
-    body: Option<Body<'c>>,
+    body: Option<Body>,
 }
 
-impl<'a, 'b, 'c, 'd> Default for AuthHeader<'a, 'b, 'c, 'd> {
+impl<'a, 'b, 'd> Default for AuthHeader<'a, 'b, 'd> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, 'b, 'c, 'd> AuthHeader<'a, 'b, 'c, 'd> {
+impl<'a, 'b, 'd> AuthHeader<'a, 'b, 'd> {
     pub fn new() -> Self {
         AuthHeader {
             method: Method::Get,
@@ -193,14 +193,27 @@ impl<'a, 'b, 'c, 'd> AuthHeader<'a, 'b, 'c, 'd> {
         self
     }
 
-    pub fn set_body(mut self, body: Body<'c>) -> Self {
+    /// Set the body, based on a Body object
+    pub fn set_body(mut self, body: Body) -> Self {
         assert!(
             self.body.is_none(),
             "Body has already been set. can not set body twice"
         );
-        // set content length to the byte-length of the body, even if it is a string.
+        let body_len = body.byte_len();
         self.body = Some(body);
-        self.set_content_length_without_body(body.byte_len())
+        self.set_content_length_without_body(body_len)
+    }
+
+    /// set a body based on a slice of data. 
+    pub fn set_binary_body(mut self, data: &[u8]) -> Self {
+        let body = Body::from_bytes(Bytes::copy_from_slice(data));
+        self.set_body(body)
+    }
+
+    /// set a body based on a utf8 str. 
+    pub fn set_text_body(mut self, data: &str) -> Self {
+        let body = Body::from_str(data);
+        self.set_body(body)
     }
 
     // set_query_parameters assumes the query parameters do not have redundant whitespace, are url-decoded and parameter-names are in lower-case.
@@ -255,7 +268,7 @@ impl<'a, 'b, 'c, 'd> AuthHeader<'a, 'b, 'c, 'd> {
 
     /// Build a 'StorageRequest' object based on the current input in the 'AuthHeader'.
     /// During the build phase the headermap is extended with a x-ms-date and an 'Authorization' header.
-    pub fn build(mut self) -> StorageRequest<'c> {
+    pub fn build(mut self) -> StorageRequest {
         let url = format!(
             "{PROTOCOL}://{}.{}{}",
             self.store_account.as_ref().expect(

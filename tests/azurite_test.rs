@@ -70,7 +70,7 @@ fn test_create_container() {
 }
 
 fn test_create_block_blob() {
-    let body_content = BLOB_CONTENT.as_bytes();
+    let body_content = BLOB_CONTENT;
 
     println!(
         "\nCreate blob '{BLOB_NAME}' in container '{CONTAINER}' in store-account '{TEST_STORE_ACCOUNT}'."
@@ -89,7 +89,7 @@ fn test_create_block_blob() {
         .set_path(&path)
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .insert_header("x-ms-blob-type", "BlockBlob".parse().unwrap())
-        .set_body(Body::Bytes(body_content))
+        .set_text_body(body_content)
         .build();
 
     let headers = sr.extract_headermap();

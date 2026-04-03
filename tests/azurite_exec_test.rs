@@ -62,7 +62,7 @@ fn test_exec_create_block_blob() {
         .set_path(&format!("/{CONTAINER}/{BLOB_NAME}"))
         .insert_header("x-ms-version", "2019-12-12".parse().unwrap())
         .insert_header("x-ms-blob-type", "BlockBlob".parse().unwrap())
-        .set_body(Body::Bytes(body_content))
+        .set_binary_body(body_content)
         .build()
         .exec_blocking();
 

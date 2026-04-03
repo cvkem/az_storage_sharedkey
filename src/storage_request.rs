@@ -6,23 +6,23 @@ use reqwest::{
     header::HeaderMap,
 };
 
-pub struct StorageRequest<'c> {
+pub struct StorageRequest {
     method: Method,
     url: String,
     query_params: Option<Vec<(String, String)>>,
     unsigned_authorization: String,
     headermap: Option<HeaderMap>,
-    body: Option<Body<'c>>,
+    body: Option<Body>,
 }
 
-impl<'c> StorageRequest<'c> {
+impl StorageRequest {
     pub fn new(
         method: Method,
         url: String,
         query_params: Option<Vec<(String, String)>>,
         unsigned_authorization: String,
         headermap: HeaderMap,
-        body: Option<Body<'c>>,
+        body: Option<Body>,
     ) -> Self {
         let headermap = Some(headermap);
         StorageRequest {
@@ -58,14 +58,6 @@ impl<'c> StorageRequest<'c> {
         &self.query_params
     }
 
-    /// this function will consume the 'body' as the body needs to be passed through, and that could extend minimal lifetime of the 'StorageRequest'.
-    pub fn body_as_bytes(&self) -> Option<&'c [u8]> {
-        // use and_then
-        match self.body {
-            Some(b) => Some(b.as_bytes()),
-            None => None,
-        }
-    }
 
     pub fn exec_blocking(mut self) -> Result<Response, Error> {
         let client = blocking::Client::new();
@@ -90,10 +82,8 @@ impl<'c> StorageRequest<'c> {
             client
         };
 
-        let client = if let Some(body) = self.body_as_bytes() {
-            let bc = body.to_owned(); // This make a copy of the referenced data, such that it can be moved to the bytes::Bytes that is generated for the body.
-            // Basically this is a delayed copy/clone. It could be done earlier to make the code simples (less lifetimes needed) as it needs to happen now anyway.
-            client.body(bc)
+        let client = if let Some(body) = self.body {
+            client.body(body.into_bytes())
         } else {
             client
         };

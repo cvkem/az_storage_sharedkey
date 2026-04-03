@@ -59,6 +59,7 @@ name = "az_storage_sharedkey"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "bytes",
  "chrono",
  "hmac",
  "regex",
